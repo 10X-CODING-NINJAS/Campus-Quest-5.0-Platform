@@ -1,4 +1,5 @@
-import { CheckCircle2, Lock, ChevronRight, TrendingUp } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, ChevronRight, ChevronLeft, TrendingUp } from 'lucide-react';
 
 const leaderboardData = [
   { rank: 1, name: 'Web-Warriors', score: 680, solved: 8, time: '00:42:11', dot: '#ef4444', self: false },
@@ -7,27 +8,6 @@ const leaderboardData = [
   { rank: 4, name: 'Earth-1610', score: 420, solved: 6, time: '00:52:18', dot: '#cc1a1a', self: true },
   { rank: 5, name: 'Spectacular Coders', score: 410, solved: 6, time: '00:53:01', dot: '#a78bfa', self: false },
 ];
-
-const notifications = [
-  { type: 'update', color: '#1adb6e', label: 'Mission Update', text: 'Longitude fully recovered!', time: '2 min ago' },
-  { type: 'sense', color: '#f59e0b', label: 'Spider Sense Used', text: 'Question 5 solved using Spider Sense.', time: '15 min ago' },
-  { type: 'broadcast', color: '#ef4444', label: 'System Broadcast', text: 'Stay focused, true believer.', time: '20 min ago' },
-];
-
-function IntelProgressBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = (value / max) * 100;
-  return (
-    <div
-      className="h-2.5 rounded-full overflow-hidden"
-      style={{ background: '#1e1e3a' }}
-    >
-      <div
-        className="h-full rounded-full transition-all duration-500"
-        style={{ width: `${pct}%`, background: color, boxShadow: `0 0 6px ${color}60` }}
-      />
-    </div>
-  );
-}
 
 function RankIndicator({ rank }: { rank: number }) {
   const colors = ['leaderboard-rank-1', 'leaderboard-rank-2', 'leaderboard-rank-3'];
@@ -39,70 +19,51 @@ function RankIndicator({ rank }: { rank: number }) {
 }
 
 export default function RightPanel() {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  if (isCollapsed) {
+    return (
+      <aside
+        className="w-12 flex-shrink-0 border-l border-spider-border flex flex-col items-center py-4 cursor-pointer hover:bg-white/[0.01] transition-all select-none"
+        style={{ background: '#0d0d1e' }}
+        onClick={() => setIsCollapsed(false)}
+        title="Expand Stats Panel"
+      >
+        <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-spider-bg-hover transition-colors mb-6">
+          <ChevronLeft className="w-4 h-4 text-spider-text-dim" />
+        </button>
+        <div className="flex-1 flex items-center justify-center">
+          <span
+            className="text-[10px] font-bold text-spider-text-dim tracking-[0.2em] uppercase select-none whitespace-nowrap"
+            style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+          >
+            Leaderboard & Results
+          </span>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside
       className="w-72 flex-shrink-0 border-l border-spider-border flex flex-col overflow-hidden select-none"
       style={{ background: '#0d0d1e' }}
     >
+      {/* Panel Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-spider-border bg-[#080810]/30 flex-shrink-0">
+        <span className="text-white font-bold text-xs font-display tracking-widest uppercase">Workspace Stats</span>
+        <button
+          onClick={() => setIsCollapsed(true)}
+          className="w-6 h-6 flex items-center justify-center rounded hover:bg-spider-bg-hover transition-colors"
+          title="Collapse Panel"
+        >
+          <ChevronRight className="w-4 h-4 text-spider-text-dim" />
+        </button>
+      </div>
+
       <div className="flex-1 overflow-y-auto">
-        {/* Mission Intel */}
-        <div className="px-4 pt-4 pb-3 border-b border-spider-border">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-white font-bold text-xs font-display tracking-widest uppercase">Mission Intel</span>
-          </div>
-          <p className="text-spider-text-muted text-xs mb-3">Data Fragments Recovered</p>
-
-          <div className="space-y-3">
-            <div className="intel-card">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-spider-text-dim text-xs font-semibold uppercase tracking-wider">Latitude</span>
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className="text-xs px-1.5 py-0.5 rounded font-bold"
-                    style={{ background: 'rgba(26,219,110,0.12)', color: '#1adb6e', fontSize: '9px', letterSpacing: '0.1em' }}
-                  >
-                    COMPLETE
-                  </span>
-                  <span className="text-white font-bold text-sm font-display">22.81° N</span>
-                </div>
-              </div>
-              <IntelProgressBar value={8} max={8} color="#1adb6e" />
-            </div>
-
-            <div className="intel-card">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-spider-text-dim text-xs font-semibold uppercase tracking-wider">Longitude</span>
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className="text-xs px-1.5 py-0.5 rounded font-bold"
-                    style={{ background: 'rgba(26,219,110,0.12)', color: '#1adb6e', fontSize: '9px', letterSpacing: '0.1em' }}
-                  >
-                    COMPLETE
-                  </span>
-                  <span className="text-white font-bold text-sm font-display">88.37° E</span>
-                </div>
-              </div>
-              <IntelProgressBar value={8} max={8} color="#1adb6e" />
-            </div>
-
-            <div className="intel-card">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-spider-text-dim text-xs font-semibold uppercase tracking-wider">Riddle</span>
-                <div className="flex items-center gap-1.5">
-                  <Lock className="w-3 h-3 text-spider-purple" />
-                  <span className="text-white font-bold text-sm font-display">3 / 4</span>
-                </div>
-              </div>
-              <IntelProgressBar value={3} max={4} color="#8b5cf6" />
-              <p className="text-spider-text-muted text-xs mt-2 italic">
-                After the final piece of the riddle, the exact location will be revealed.
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Test Results */}
-        <div className="px-4 pt-4 pb-3 border-b border-spider-border">
+        <div className="px-4 pt-4 pb-4 border-b border-spider-border">
           <span className="text-white font-bold text-xs font-display tracking-widest uppercase">Test Results</span>
 
           <div className="mt-3 flex items-center gap-2 mb-2">
@@ -111,34 +72,46 @@ export default function RightPanel() {
               Accepted
             </span>
           </div>
-          <p className="text-spider-text-muted text-xs mb-3">All test cases passed</p>
+          <p className="text-spider-text-muted text-xs mb-3">All test cases passed successfully.</p>
 
           <div
-            className="rounded-lg p-3 grid grid-cols-3 gap-3"
+            className="rounded-lg p-3 grid grid-cols-2 gap-x-3 gap-y-4"
             style={{ background: '#080810', border: '1px solid #1e1e3a' }}
           >
-            <div className="text-center">
+            <div>
               <div className="text-white font-bold text-sm font-display">18 / 18</div>
-              <div className="text-spider-text-muted text-xs">Test Cases</div>
+              <div className="text-spider-text-muted text-[10px] uppercase font-semibold">Test Cases</div>
             </div>
-            <div className="text-center border-x border-spider-border">
+            <div className="border-l border-spider-border pl-3">
               <div className="text-white font-bold text-sm font-display">37 ms</div>
-              <div className="text-spider-text-muted text-xs">Runtime</div>
+              <div className="text-spider-text-muted text-[10px] uppercase font-semibold">Runtime</div>
             </div>
-            <div className="text-center">
+            <div className="border-t border-spider-border pt-3">
               <div className="text-white font-bold text-sm font-display">12.4 MB</div>
-              <div className="text-spider-text-muted text-xs">Memory</div>
+              <div className="text-spider-text-muted text-[10px] uppercase font-semibold">Memory</div>
+            </div>
+            <div className="border-t border-l border-spider-border pt-3 pl-3">
+              <div className="text-white font-bold text-sm font-display">2.4%</div>
+              <div className="text-spider-text-muted text-[10px] uppercase font-semibold">Peak CPU</div>
+            </div>
+            <div className="border-t border-spider-border pt-3">
+              <div className="text-white font-bold text-sm font-display">0.85 KB</div>
+              <div className="text-spider-text-muted text-[10px] uppercase font-semibold">Code Size</div>
+            </div>
+            <div className="border-t border-l border-spider-border pt-3 pl-3">
+              <div className="text-white font-bold text-sm font-display">1.2 KB</div>
+              <div className="text-spider-text-muted text-[10px] uppercase font-semibold">Output Size</div>
             </div>
           </div>
 
-          <button className="mt-3 flex items-center gap-1 text-spider-red text-xs font-semibold hover:text-spider-red-bright transition-colors cursor-pointer">
+          <button className="mt-3.5 flex items-center gap-1 text-spider-red text-xs font-semibold hover:text-spider-red-bright transition-colors cursor-pointer">
             View Submission
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Leaderboard */}
-        <div className="px-4 pt-4 pb-3 border-b border-spider-border">
+        <div className="px-4 pt-4 pb-4 border-b border-spider-border">
           <div className="flex items-center justify-between mb-3">
             <span className="text-white font-bold text-xs font-display tracking-widest uppercase">Leaderboard</span>
             <button className="text-spider-red text-xs font-semibold hover:text-spider-red-bright transition-colors cursor-pointer">
@@ -182,45 +155,6 @@ export default function RightPanel() {
                   {entry.score}
                 </span>
                 <span className="text-spider-text-muted text-xs text-right font-mono">{entry.time}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Notifications */}
-        <div className="px-4 pt-4 pb-3 border-b border-spider-border">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-white font-bold text-xs font-display tracking-widest uppercase">Notifications</span>
-            <button className="text-spider-red text-xs font-semibold hover:text-spider-red-bright transition-colors cursor-pointer">
-              View All
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {notifications.map((n, i) => (
-              <div
-                key={i}
-                className="rounded-lg px-3 py-2.5"
-                style={{ background: '#080810', border: '1px solid #1e1e3a' }}
-              >
-                <div className="flex items-start gap-2">
-                  <div
-                    className="notification-dot mt-1"
-                    style={{ background: n.color, boxShadow: `0 0 6px ${n.color}` }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span
-                        className="text-xs font-semibold"
-                        style={{ color: n.color }}
-                      >
-                        {n.label}
-                      </span>
-                      <span className="text-spider-text-muted text-xs">{n.time}</span>
-                    </div>
-                    <p className="text-spider-text-dim text-xs leading-relaxed">{n.text}</p>
-                  </div>
-                </div>
               </div>
             ))}
           </div>
