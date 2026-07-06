@@ -120,22 +120,22 @@ export default function ProblemPanel() {
       base: 'vs-dark',
       inherit: true,
       rules: [
-        { token: 'comment', foreground: '64748b', fontStyle: 'italic' },
+        { token: 'comment', foreground: '8fa3b8', fontStyle: 'italic' },
         { token: 'keyword', foreground: 'ff3b30', fontStyle: 'bold' },
-        { token: 'number', foreground: '1adb6e' },
-        { token: 'string', foreground: 'a78bfa' },
-        { token: 'type', foreground: '60a5fa' },
-        { token: 'delimiter', foreground: '94a3b8' },
+        { token: 'number', foreground: '00ff66' },
+        { token: 'string', foreground: 'ffdd33' },
+        { token: 'type', foreground: '38bdf8', fontStyle: 'bold' },
+        { token: 'delimiter', foreground: 'ffffff' },
       ],
       colors: {
-        'editor.background': '#00000000', // Transparent to let custom PNG backgrounds show through
+        'editor.background': '#00000000',
         'editorGutter.background': '#00000000',
-        'editor.foreground': '#e2e8f0',
-        'editorLineNumber.foreground': '#475569',
-        'editorLineNumber.activeForeground': '#cc1a1a',
-        'editor.lineHighlightBackground': '#ffffff0a',
-        'editor.selectionBackground': '#cc1a1a33',
-        'editorCursor.foreground': '#cc1a1a',
+        'editor.foreground': '#ffffff',
+        'editorLineNumber.foreground': '#94a3b8',
+        'editorLineNumber.activeForeground': '#ff3b30',
+        'editor.lineHighlightBackground': '#ffffff14',
+        'editor.selectionBackground': '#ff3b3044',
+        'editorCursor.foreground': '#ff3b30',
       }
     });
     monaco.editor.setTheme('spider-theme-transparent');
@@ -303,8 +303,8 @@ export default function ProblemPanel() {
           >
             {/* Translucent overlay for code legibility */}
             <div
-              className="absolute inset-0 backdrop-blur-[2px] transition-colors duration-300"
-              style={{ background: 'rgba(10, 10, 24, 0.82)' }}
+              className="absolute inset-0 transition-colors duration-300"
+              style={{ background: 'rgba(0, 0, 0, 0.15)' }}
             />
             
             <div className="absolute inset-0 z-10">
