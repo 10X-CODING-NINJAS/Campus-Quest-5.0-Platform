@@ -40,7 +40,7 @@ export default function TopBar() {
   };
 
   return (
-    <header className="flex items-center h-16 px-4 border-b-4 border-black bg-[#0d0d1e] flex-shrink-0 relative z-10 select-none comic-halftone">
+    <header className="flex items-center h-16 px-4 border-b-4 border-black bg-[#0d0d1e]/30 backdrop-blur-md flex-shrink-0 relative z-10 select-none comic-halftone">
       {/* Logo */}
       <div className="flex items-center gap-2.5 flex-shrink-0">
         <div className="relative flex items-center justify-center w-10 h-10 border-2 border-black bg-red-600 rounded-full shadow-[2px_2px_0px_0px_#000]">

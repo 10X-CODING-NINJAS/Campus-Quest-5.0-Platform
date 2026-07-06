@@ -9,7 +9,7 @@ interface ComicModalProps {
   totalCount: number;
   runtimeMs: number;
   memoryMb: number;
-  message?: string;
+  message?: string | undefined;
 }
 
 export default function ComicModal({
