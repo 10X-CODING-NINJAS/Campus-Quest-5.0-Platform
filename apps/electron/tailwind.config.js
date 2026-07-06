@@ -33,8 +33,10 @@ module.exports = {
         }
       },
       fontFamily: {
-        display: ['Outfit', 'Inter', 'sans-serif'],
-        mono: ['Fira Code', 'Courier New', 'monospace'],
+        display: ['Bangers', 'Outfit', 'sans-serif'],
+        sans: ['"Comic Neue"', 'Inter', 'sans-serif'],
+        mono: ['"Fira Code"', 'Courier New', 'monospace'],
+        digital: ['Orbitron', 'monospace'],
       }
     },
   },

@@ -1,125 +1,11 @@
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Play, Send, Maximize2, Settings } from 'lucide-react';
-import Editor from '@monaco-editor/react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-// Import background assets from Assets/Web folder
-import bgBluePink from '../../Assets/Web/Blue Pink web bg.png';
-import bgBlue from '../../Assets/Web/Blue web bg.png';
-import bgGreen from '../../Assets/Web/Green web bg.png';
-import bgOrange from '../../Assets/Web/Orange web bg.png';
-import bgRed from '../../Assets/Web/Red web bg.png';
-
-// Import background assets from Assets/Question folder
-import qBlack from '../../Assets/Question/Black Question bg.jpg';
-import qBlue from '../../Assets/Question/Blue Question bg.jpeg';
-import qGreen from '../../Assets/Question/Green Question bg.jpg';
-import qRed from '../../Assets/Question/Red Question bg.jpg';
-import qWhite from '../../Assets/Question/White Question bg.jpg';
-
-const WEB_BACKGROUNDS = [bgRed, bgBluePink, bgBlue, bgGreen, bgOrange];
-const QUESTION_BACKGROUNDS = [qBlack, qBlue, qGreen, qRed, qWhite];
-
-const C_TEMPLATE = `#include <stdio.h>
-#include <stdlib.h>
-
-int main() {
-    int n, m;
-    if (scanf("%d %d", &n, &m) != 2) return 0;
-    
-    // Write your C code here
-    
-    return 0;
+interface ProblemPanelProps {
+  questionNum: number;
+  setQuestionNum: React.Dispatch<React.SetStateAction<number>>;
 }
-`;
 
-const CXX_TEMPLATE = `#include <bits/stdc++.h>
-using namespace std;
-
-int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-    
-    int n, m;
-    if (!(cin >> n >> m)) return 0;
-    vector<int> parent(n+1), sz(n+1, 1);
-    iota(parent.begin(), parent.end(), 0);
-    
-    function<int(int)> find = [&](int x) {
-        if (parent[x] == x) return x;
-        return parent[x] = find(parent[x]);
-    };
-    
-    // Write your C++ code here
-    
-    return 0;
-}
-`;
-
-const PY_TEMPLATE = `import sys
-
-def main():
-    lines = sys.stdin.read().split()
-    if not lines:
-        return
-    n = int(lines[0])
-    m = int(lines[1])
-    
-    # Write your Python 3 code here
-
-if __name__ == '__main__':
-    main()
-`;
-
-const JAVA_TEMPLATE = `import java.io.*;
-import java.util.*;
-
-public class Main {
-    public static void main(String[] args) throws IOException {
-        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-        String line = br.readLine();
-        if (line == null) return;
-        StringTokenizer st = new StringTokenizer(line);
-        int n = Integer.parseInt(st.nextToken());
-        int m = Integer.parseInt(st.nextToken());
-        
-        // Write your Java code here
-    }
-}
-`;
-
-const LANGUAGES = [
-  { id: 'cpp', name: 'C++', ext: 'main.cpp' },
-  { id: 'c', name: 'C', ext: 'main.c' },
-  { id: 'python', name: 'Python 3', ext: 'main.py' },
-  { id: 'java', name: 'Java 17', ext: 'Main.java' },
-];
-
-export default function ProblemPanel() {
-  const [selectedLang, setSelectedLang] = useState('cpp');
-  const [questionNum, setQuestionNum] = useState(7); // Default to Question 7
-  
-  const [codes, setCodes] = useState<Record<string, string>>({
-    c: C_TEMPLATE,
-    cpp: CXX_TEMPLATE,
-    python: PY_TEMPLATE,
-    java: JAVA_TEMPLATE,
-  });
-  const [isSaved, setIsSaved] = useState(true);
-
-  const activeLangConfig = LANGUAGES.find(l => l.id === selectedLang) || LANGUAGES[0];
-
-  const handleEditorChange = (value: string | undefined) => {
-    if (value !== undefined) {
-      setCodes(prev => ({
-        ...prev,
-        [selectedLang]: value,
-      }));
-      setIsSaved(false);
-      // Auto-save simulation
-      setTimeout(() => setIsSaved(true), 800);
-    }
-  };
-
+export default function ProblemPanel({ questionNum, setQuestionNum }: ProblemPanelProps) {
   const handlePrevQuestion = () => {
     setQuestionNum(prev => (prev > 1 ? prev - 1 : 10));
   };
@@ -128,254 +14,80 @@ export default function ProblemPanel() {
     setQuestionNum(prev => (prev < 10 ? prev + 1 : 1));
   };
 
-  const handleEditorDidMount = (_editor: any, monaco: any) => {
-    monaco.editor.defineTheme('spider-theme-transparent', {
-      base: 'vs-dark',
-      inherit: true,
-      rules: [
-        { token: 'comment', foreground: '8fa3b8', fontStyle: 'italic' },
-        { token: 'keyword', foreground: 'ff3b30', fontStyle: 'bold' },
-        { token: 'number', foreground: '00ff66' },
-        { token: 'string', foreground: 'ffdd33' },
-        { token: 'type', foreground: '38bdf8', fontStyle: 'bold' },
-        { token: 'delimiter', foreground: 'ffffff' },
-      ],
-      colors: {
-        'editor.background': '#00000000',
-        'editorGutter.background': '#00000000',
-        'editor.foreground': '#ffffff',
-        'editorLineNumber.foreground': '#94a3b8',
-        'editorLineNumber.activeForeground': '#ff3b30',
-        'editor.lineHighlightBackground': '#ffffff14',
-        'editor.selectionBackground': '#ff3b3044',
-        'editorCursor.foreground': '#ff3b30',
-      }
-    });
-    monaco.editor.setTheme('spider-theme-transparent');
-  };
-
-  // Determine backgrounds sequentially based on current question number
-  const questionBgIndex = (questionNum - 1) % QUESTION_BACKGROUNDS.length;
-  const webBgIndex = (questionNum - 1) % WEB_BACKGROUNDS.length;
-
   return (
-    <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+    <div className="w-80 flex-shrink-0 flex flex-col overflow-hidden bg-[#faf8f0] comic-panel p-4 text-black select-none comic-halftone">
+      
       {/* Question Nav */}
-      <div
-        className="flex items-center gap-3 px-5 py-3 border-b flex-shrink-0"
-        style={{ borderColor: '#1e1e3a', background: '#0e0e20' }}
-      >
+      <div className="flex items-center justify-between mb-4 bg-white border-3 border-black p-2 rounded-none shadow-[2px_2px_0px_#000]">
         <button
           onClick={handlePrevQuestion}
-          className="w-6 h-6 flex items-center justify-center rounded hover:bg-spider-bg-hover transition-colors cursor-pointer"
+          className="w-8 h-8 flex items-center justify-center border-2 border-black bg-yellow-400 hover:bg-yellow-500 rounded-none transition-colors cursor-pointer shadow-[1px_1px_0px_#000] active:translate-y-[1px]"
         >
-          <ChevronLeft className="w-4 h-4 text-spider-text-dim" />
+          <ChevronLeft className="w-5 h-5 text-black stroke-[3px]" />
         </button>
-        <span className="text-spider-text text-sm font-medium">Question {questionNum} of 10</span>
+        <span className="font-display font-bold text-sm text-black">Q. {questionNum} / 10</span>
         <button
           onClick={handleNextQuestion}
-          className="w-6 h-6 flex items-center justify-center rounded hover:bg-spider-bg-hover transition-colors cursor-pointer"
+          className="w-8 h-8 flex items-center justify-center border-2 border-black bg-yellow-400 hover:bg-yellow-500 rounded-none transition-colors cursor-pointer shadow-[1px_1px_0px_#000] active:translate-y-[1px]"
         >
-          <ChevronRight className="w-4 h-4 text-spider-text-dim" />
+          <ChevronRight className="w-5 h-5 text-black stroke-[3px]" />
         </button>
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Problem Statement (Top) */}
-        <div
-          className="h-[38%] flex-shrink-0 border-b border-spider-border flex flex-col overflow-hidden relative"
-          style={{
-            backgroundImage: `url("${QUESTION_BACKGROUNDS[questionBgIndex]}")`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
-        >
-          {/* Overlay to keep the text readable while letting background stand out */}
-          <div
-            className="absolute inset-0"
-            style={{ background: 'rgba(13, 13, 30, 0.55)' }}
-          />
+      {/* Mission Brief Badge */}
+      <div className="mb-4">
+        <div className="comic-badge-yellow text-xs font-bold tracking-widest uppercase w-full text-center py-1 rounded-none">
+          MISSION BRIEF: THE DIMENSIONAL WEAVE
+        </div>
+      </div>
 
-          <div className="flex-1 overflow-y-auto p-4 select-text relative z-10">
-            {/* Title */}
-            <div className="mb-3">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="badge-hard">HARD</span>
-              </div>
-              <h2 className="text-white text-base font-bold font-display tracking-wide">Web of Connections</h2>
-            </div>
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+        {/* Description card */}
+        <div className="bg-[#fafafa] border-3 border-black p-4 rounded-none shadow-[3px_3px_0px_#000] relative overflow-hidden">
+          {/* Subtle background web pattern effect */}
+          <div className="absolute inset-0 opacity-5 pointer-events-none comic-halftone" />
+          <p className="text-xs font-sans font-bold leading-relaxed text-gray-800">
+            The network of the Spider-Verse is connections. Given a web of nodes, determine the minimum number of connections required to connect all nodes together.
+          </p>
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              {/* Description & Constraints */}
-              <div className="space-y-3">
-                <div className="text-spider-text leading-relaxed">
-                  <p>The network of the Spider-Verse is made of connections. Given a web of nodes, determine the minimum number of links needed to connect all nodes together.</p>
-                </div>
-                <div>
-                  <h4 className="text-spider-text-dim font-bold uppercase tracking-wider mb-1">Input</h4>
-                  <p className="text-spider-text leading-relaxed">
-                    The first line contains two integers <code className="text-spider-green bg-spider-bg px-1 rounded font-mono">n</code> and <code className="text-spider-green bg-spider-bg px-1 rounded font-mono">m</code> — number of nodes and number of connections.
-                  </p>
-                  <p className="text-spider-text leading-relaxed mt-1">
-                    Next <code className="text-spider-green bg-spider-bg px-1 rounded font-mono">m</code> lines contain <code className="text-spider-green bg-spider-bg px-1 rounded font-mono">u, v</code> — an undirected connection between node <code className="text-spider-green bg-spider-bg px-1 rounded font-mono">u</code> and node <code className="text-spider-green bg-spider-bg px-1 rounded font-mono">v</code>.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="text-spider-text-dim font-bold uppercase tracking-wider mb-1">Output</h4>
-                  <p className="text-spider-text leading-relaxed">
-                    Print the minimum number of additional connections required to make the network fully connected.
-                  </p>
-                </div>
-              </div>
-
-              {/* Example Card */}
-              <div>
-                <div
-                  className="rounded-lg overflow-hidden"
-                  style={{ border: '1px solid #1e1e3a', background: '#080810' }}
-                >
-                  <div className="px-3 py-1.5 border-b border-spider-border">
-                    <span className="text-spider-text-dim font-semibold">Example 1:</span>
-                  </div>
-                  <div className="p-3">
-                    <div className="flex gap-4">
-                      <div className="flex-1">
-                        <div className="text-spider-text-dim font-semibold mb-1">Input</div>
-                        <div
-                          className="rounded p-2 font-mono text-spider-text leading-5"
-                          style={{ background: '#0e0e20', border: '1px solid #1e1e3a' }}
-                        >
-                          5 3<br />1 2<br />2 3<br />4 5
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-spider-text-dim font-semibold mb-1">Output</div>
-                        <div
-                          className="rounded p-2 font-mono text-spider-text leading-5"
-                          style={{ background: '#0e0e20', border: '1px solid #1e1e3a' }}
-                        >
-                          1
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-2 pt-2 border-t border-spider-border">
-                      <div className="text-spider-text-dim font-semibold mb-0.5">Explanation:</div>
-                      <p className="text-spider-text-dim">
-                        We need one connection between {'{1,2,3}'} and {'{4,5}'}.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+        {/* Difficulty Badge */}
+        <div className="text-center">
+          <div className="bg-red-500 border-3 border-black text-white font-display font-bold text-sm tracking-wider px-4 py-1.5 inline-block transform rotate-[1deg] shadow-[2px_2px_0px_#000] rounded-none">
+            HARD: WEB OF CONNECTIONS
           </div>
         </div>
 
-        {/* Code Editor (Bottom) */}
-        <div className="flex-1 flex flex-col overflow-hidden" style={{ background: '#0a0a18' }}>
-          {/* Editor Toolbar */}
-          <div
-            className="flex items-center gap-2 px-3 py-2 border-b flex-shrink-0"
-            style={{ borderColor: '#1e1e3a', background: '#0d0d1e' }}
-          >
-            {/* Language Selector Dropdown */}
-            <div className="relative">
-              <select
-                value={selectedLang}
-                onChange={(e) => setSelectedLang(e.target.value)}
-                className="bg-[#111128] text-spider-text text-xs font-semibold font-mono rounded-md px-3 py-1 outline-none cursor-pointer border border-spider-border hover:bg-spider-bg-hover transition-colors appearance-none pr-8 relative"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 8px center',
-                  backgroundSize: '12px'
-                }}
-              >
-                {LANGUAGES.map(lang => (
-                  <option key={lang.id} value={lang.id}>
-                    {lang.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="w-px h-4 bg-spider-border mx-1" />
-
-            {/* File Tab */}
-            <div
-              className="flex items-center gap-2 px-3 py-1 rounded-md"
-              style={{ background: '#111128', border: '1px solid #2a2a50' }}
-            >
-              <span className="text-white text-xs font-mono">{activeLangConfig.ext}</span>
-              {!isSaved && <span className="w-1.5 h-1.5 rounded-full bg-spider-red" title="Unsaved changes" />}
-            </div>
-
-            <div className="flex-1" />
-
-            {/* Editor Controls */}
-            <button className="w-7 h-7 flex items-center justify-center rounded hover:bg-spider-bg-hover transition-colors cursor-pointer text-spider-text-dim hover:text-white" title="Fullscreen">
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
-            <button className="w-7 h-7 flex items-center justify-center rounded hover:bg-spider-bg-hover transition-colors cursor-pointer text-spider-text-dim hover:text-white" title="Editor settings">
-              <Settings className="w-3.5 h-3.5" />
-            </button>
+        {/* Example card */}
+        <div className="bg-[#fdf6e2] border-3 border-black p-4 rounded-none shadow-[3px_3px_0px_#000]">
+          <div className="font-display font-bold text-sm mb-3 border-b-2 border-black/10 pb-1 text-red-600">
+            Example 1:
           </div>
 
-          {/* Monaco Editor Content with custom background container */}
-          <div
-            className="flex-1 relative overflow-hidden"
-            style={{
-              backgroundImage: `url("${WEB_BACKGROUNDS[webBgIndex]}")`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            }}
-          >
-            {/* Translucent overlay for code legibility */}
-            <div
-              className="absolute inset-0 transition-colors duration-300"
-              style={{ background: 'rgba(0, 0, 0, 0.15)' }}
-            />
-            
-            <div className="absolute inset-0 z-10">
-              <Editor
-                height="100%"
-                language={selectedLang === 'cpp' ? 'cpp' : selectedLang === 'c' ? 'c' : selectedLang}
-                value={codes[selectedLang]}
-                onChange={handleEditorChange}
-                onMount={handleEditorDidMount}
-                options={{
-                  fontSize: 13,
-                  fontFamily: "'Fira Code', 'Courier New', monospace",
-                  lineNumbers: 'on',
-                  roundedSelection: true,
-                  scrollBeyondLastLine: false,
-                  readOnly: false,
-                  automaticLayout: true,
-                  minimap: { enabled: false },
-                  padding: { top: 12, bottom: 12 },
-                }}
-              />
+          <div className="space-y-3">
+            <div>
+              <div className="font-display font-bold text-xs uppercase text-gray-600 mb-1">Input</div>
+              <div className="font-mono text-xs bg-stone-800 text-green-400 p-2.5 border-2 border-black rounded-none shadow-[1px_1px_0px_#000] leading-relaxed">
+                5 3<br />
+                1 2<br />
+                2 3<br />
+                4 5
+              </div>
             </div>
-          </div>
 
-          {/* Action Bar */}
-          <div
-            className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0"
-            style={{ borderColor: '#1e1e3a', background: '#0d0d1e' }}
-          >
-            <div className="flex items-center gap-2">
-              <button className="btn-run">
-                <Play className="w-3.5 h-3.5 fill-current" />
-                Run Code
-              </button>
-              <button className="btn-primary">
-                <Send className="w-3.5 h-3.5" />
-                Submit Code
-              </button>
+            <div>
+              <div className="font-display font-bold text-xs uppercase text-gray-600 mb-1">Output</div>
+              <div className="font-mono text-xs bg-stone-800 text-green-400 p-2.5 border-2 border-black rounded-none shadow-[1px_1px_0px_#000] leading-relaxed w-16 text-center">
+                1
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-spider-text-muted text-xs">
-              <div className="live-dot" />
-              {isSaved ? 'Auto-saved' : 'Saving...'}
+
+            <div className="border-t-2 border-black/10 pt-2.5 mt-2">
+              <div className="font-display font-bold text-xs text-gray-700 mb-0.5">Explanation:</div>
+              <p className="text-xs text-gray-600 leading-normal">
+                We need one connection between (1,2,3,4) and (4,5).
+              </p>
             </div>
           </div>
         </div>

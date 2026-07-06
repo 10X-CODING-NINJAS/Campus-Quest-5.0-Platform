@@ -1,177 +1,270 @@
 import { useState } from 'react';
-import { CheckCircle2, ChevronRight, ChevronLeft, TrendingUp } from 'lucide-react';
+import { Play, Send, Maximize2, Settings } from 'lucide-react';
+import Editor from '@monaco-editor/react';
 
-const leaderboardData = [
-  { rank: 1, name: 'Web-Warriors', score: 680, solved: 8, time: '00:42:11', dot: '#ef4444', self: false },
-  { rank: 2, name: "Peter's Pals", score: 590, solved: 7, time: '00:44:02', dot: '#3b82f6', self: false },
-  { rank: 3, name: 'Binary Spiders', score: 520, solved: 7, time: '00:46:33', dot: '#22c55e', self: false },
-  { rank: 4, name: 'Earth-1610', score: 420, solved: 6, time: '00:52:18', dot: '#cc1a1a', self: true },
-  { rank: 5, name: 'Spectacular Coders', score: 410, solved: 6, time: '00:53:01', dot: '#a78bfa', self: false },
+// Import background assets from Assets/Web folder
+import bgBluePink from '../../Assets/Web/Blue Pink web bg.png';
+import bgBlue from '../../Assets/Web/Blue web bg.png';
+import bgGreen from '../../Assets/Web/Green web bg.png';
+import bgOrange from '../../Assets/Web/Orange web bg.png';
+import bgRed from '../../Assets/Web/Red web bg.png';
+
+const WEB_BACKGROUNDS = [bgRed, bgBluePink, bgBlue, bgGreen, bgOrange];
+
+const C_TEMPLATE = `#include <stdio.h>
+#include <stdlib.h>
+
+int main() {
+    int n, m;
+    if (scanf("%d %d", &n, &m) != 2) return 0;
+    
+    // Write your C code here
+    
+    return 0;
+}
+`;
+
+const CXX_TEMPLATE = `#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    
+    int n, m;
+    if (!(cin >> n >> m)) return 0;
+    vector<int> parent(n+1), sz(n+1, 1);
+    iota(parent.begin(), parent.end(), 0);
+    
+    function<int(int)> find = [&](int x) {
+        if (parent[x] == x) return x;
+        return parent[x] = find(parent[x]);
+    };
+    
+    // Write your C++ code here
+    
+    return 0;
+}
+`;
+
+const PY_TEMPLATE = `import sys
+
+def main():
+    lines = sys.stdin.read().split()
+    if not lines:
+        return
+    n = int(lines[0])
+    m = int(lines[1])
+    
+    # Write your Python 3 code here
+
+if __name__ == '__main__':
+    main()
+`;
+
+const JAVA_TEMPLATE = `import java.io.*;
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) throws IOException {
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        String line = br.readLine();
+        if (line == null) return;
+        StringTokenizer st = new StringTokenizer(line);
+        int n = Integer.parseInt(st.nextToken());
+        int m = Integer.parseInt(st.nextToken());
+        
+        // Write your Java code here
+    }
+}
+`;
+
+const LANGUAGES = [
+  { id: 'cpp', name: 'C++', ext: 'main.cpp' },
+  { id: 'c', name: 'C', ext: 'main.c' },
+  { id: 'python', name: 'Python 3', ext: 'main.py' },
+  { id: 'java', name: 'Java 17', ext: 'Main.java' },
 ];
 
-function RankIndicator({ rank }: { rank: number }) {
-  const colors = ['leaderboard-rank-1', 'leaderboard-rank-2', 'leaderboard-rank-3'];
-  return (
-    <span className={`font-bold text-sm font-display ${rank <= 3 ? colors[rank - 1] : 'text-spider-text-dim'}`}>
-      {rank}
-    </span>
-  );
+interface RightPanelProps {
+  questionNum: number;
+  selectedLang: string;
+  setSelectedLang: (lang: string) => void;
+  isSaved: boolean;
+  setIsSaved: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-export default function RightPanel() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+export default function RightPanel({
+  questionNum,
+  selectedLang,
+  setSelectedLang,
+  isSaved,
+  setIsSaved
+}: RightPanelProps) {
+  const [codes, setCodes] = useState<Record<string, string>>({
+    c: C_TEMPLATE,
+    cpp: CXX_TEMPLATE,
+    python: PY_TEMPLATE,
+    java: JAVA_TEMPLATE,
+  });
 
-  if (isCollapsed) {
-    return (
-      <aside
-        className="w-12 flex-shrink-0 border-l border-spider-border flex flex-col items-center py-4 cursor-pointer hover:bg-white/[0.01] transition-all select-none"
-        style={{ background: '#0d0d1e' }}
-        onClick={() => setIsCollapsed(false)}
-        title="Expand Stats Panel"
-      >
-        <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-spider-bg-hover transition-colors mb-6">
-          <ChevronLeft className="w-4 h-4 text-spider-text-dim" />
-        </button>
-        <div className="flex-1 flex items-center justify-center">
-          <span
-            className="text-[10px] font-bold text-spider-text-dim tracking-[0.2em] uppercase select-none whitespace-nowrap"
-            style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-          >
-            Leaderboard & Results
-          </span>
-        </div>
-      </aside>
-    );
-  }
+  const activeLangConfig = LANGUAGES.find(l => l.id === selectedLang) || LANGUAGES[0];
+
+  const handleEditorChange = (value: string | undefined) => {
+    if (value !== undefined) {
+      setCodes(prev => ({
+        ...prev,
+        [selectedLang]: value,
+      }));
+      setIsSaved(false);
+      // Auto-save simulation
+      setTimeout(() => setIsSaved(true), 800);
+    }
+  };
+
+  const handleEditorDidMount = (_editor: any, monaco: any) => {
+    monaco.editor.defineTheme('spider-theme-transparent', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'comment', foreground: '8fa3b8', fontStyle: 'italic' },
+        { token: 'keyword', foreground: 'ff3b30', fontStyle: 'bold' },
+        { token: 'number', foreground: '00ff66' },
+        { token: 'string', foreground: 'ffdd33' },
+        { token: 'type', foreground: '38bdf8', fontStyle: 'bold' },
+        { token: 'delimiter', foreground: 'ffffff' },
+      ],
+      colors: {
+        'editor.background': '#0b0b14f0',
+        'editorGutter.background': '#0b0b14f0',
+        'editor.foreground': '#ffffff',
+        'editorLineNumber.foreground': '#94a3b8',
+        'editorLineNumber.activeForeground': '#ff3b30',
+        'editor.lineHighlightBackground': '#ffffff14',
+        'editor.selectionBackground': '#ff3b3044',
+        'editorCursor.foreground': '#ff3b30',
+      }
+    });
+    monaco.editor.setTheme('spider-theme-transparent');
+  };
+
+  const webBgIndex = (questionNum - 1) % WEB_BACKGROUNDS.length;
 
   return (
-    <aside
-      className="w-72 flex-shrink-0 border-l border-spider-border flex flex-col overflow-hidden select-none"
-      style={{ background: '#0d0d1e' }}
-    >
-      {/* Panel Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-spider-border bg-[#080810]/30 flex-shrink-0">
-        <span className="text-white font-bold text-xs font-display tracking-widest uppercase">Workspace Stats</span>
-        <button
-          onClick={() => setIsCollapsed(true)}
-          className="w-6 h-6 flex items-center justify-center rounded hover:bg-spider-bg-hover transition-colors"
-          title="Collapse Panel"
-        >
-          <ChevronRight className="w-4 h-4 text-spider-text-dim" />
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#0d0d1e] select-none relative comic-panel">
+      {/* Editor Header / Tab bar */}
+      <div className="flex items-center gap-3 px-4 py-2 bg-[#05050a] border-b-4 border-black flex-shrink-0">
+        <div className="relative">
+          <select
+            value={selectedLang}
+            onChange={(e) => setSelectedLang(e.target.value)}
+            className="bg-[#111128] text-white text-xs font-semibold font-mono rounded-none border-2 border-black px-3 py-1 outline-none cursor-pointer hover:bg-black/30 transition-colors appearance-none pr-8 relative"
+            style={{
+              backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 8px center',
+              backgroundSize: '12px'
+            }}
+          >
+            {LANGUAGES.map(lang => (
+              <option key={lang.id} value={lang.id}>
+                {lang.id === 'cpp' ? 'C++17' : lang.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="w-px h-4 bg-black/50" />
+
+        <div className="bg-stone-800 border-2 border-black text-white text-xs font-mono px-3 py-1 rounded-none shadow-[1px_1px_0px_#000]">
+          <span>{activeLangConfig.ext}</span>
+        </div>
+
+        <div className="flex-1" />
+
+        <button className="w-7 h-7 flex items-center justify-center rounded-none border border-transparent hover:border-black hover:bg-black/30 text-gray-400 hover:text-white transition-all cursor-pointer">
+          <Maximize2 className="w-3.5 h-3.5" />
+        </button>
+        <button className="w-7 h-7 flex items-center justify-center rounded-none border border-transparent hover:border-black hover:bg-black/30 text-gray-400 hover:text-white transition-all cursor-pointer">
+          <Settings className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Test Results */}
-        <div className="px-4 pt-4 pb-4 border-b border-spider-border">
-          <span className="text-white font-bold text-xs font-display tracking-widest uppercase">Test Results</span>
-
-          <div className="mt-3 flex items-center gap-2 mb-2">
-            <CheckCircle2 className="w-5 h-5 text-spider-green flex-shrink-0" style={{ filter: 'drop-shadow(0 0 6px #1adb6e)' }} />
-            <span className="text-spider-green font-bold text-lg font-display" style={{ textShadow: '0 0 12px #1adb6e50' }}>
-              Accepted
-            </span>
-          </div>
-          <p className="text-spider-text-muted text-xs mb-3">All test cases passed successfully.</p>
-
-          <div
-            className="rounded-lg p-3 grid grid-cols-2 gap-x-3 gap-y-4"
-            style={{ background: '#080810', border: '1px solid #1e1e3a' }}
-          >
-            <div>
-              <div className="text-white font-bold text-sm font-display">18 / 18</div>
-              <div className="text-spider-text-muted text-[10px] uppercase font-semibold">Test Cases</div>
-            </div>
-            <div className="border-l border-spider-border pl-3">
-              <div className="text-white font-bold text-sm font-display">37 ms</div>
-              <div className="text-spider-text-muted text-[10px] uppercase font-semibold">Runtime</div>
-            </div>
-            <div className="border-t border-spider-border pt-3">
-              <div className="text-white font-bold text-sm font-display">12.4 MB</div>
-              <div className="text-spider-text-muted text-[10px] uppercase font-semibold">Memory</div>
-            </div>
-            <div className="border-t border-l border-spider-border pt-3 pl-3">
-              <div className="text-white font-bold text-sm font-display">2.4%</div>
-              <div className="text-spider-text-muted text-[10px] uppercase font-semibold">Peak CPU</div>
-            </div>
-            <div className="border-t border-spider-border pt-3">
-              <div className="text-white font-bold text-sm font-display">0.85 KB</div>
-              <div className="text-spider-text-muted text-[10px] uppercase font-semibold">Code Size</div>
-            </div>
-            <div className="border-t border-l border-spider-border pt-3 pl-3">
-              <div className="text-white font-bold text-sm font-display">1.2 KB</div>
-              <div className="text-spider-text-muted text-[10px] uppercase font-semibold">Output Size</div>
-            </div>
-          </div>
-
-          <button className="mt-3.5 flex items-center gap-1 text-spider-red text-xs font-semibold hover:text-spider-red-bright transition-colors cursor-pointer">
-            View Submission
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {/* Leaderboard */}
-        <div className="px-4 pt-4 pb-4 border-b border-spider-border">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-white font-bold text-xs font-display tracking-widest uppercase">Leaderboard</span>
-            <button className="text-spider-red text-xs font-semibold hover:text-spider-red-bright transition-colors cursor-pointer">
-              View Full
-            </button>
-          </div>
-
-          <div
-            className="rounded-lg overflow-hidden"
-            style={{ border: '1px solid #1e1e3a' }}
-          >
-            <div
-              className="grid grid-cols-4 px-3 py-1.5"
-              style={{ background: '#080810', borderBottom: '1px solid #1e1e3a' }}
-            >
-              <span className="text-spider-text-muted text-xs font-semibold">#</span>
-              <span className="text-spider-text-muted text-xs font-semibold col-span-1">Team</span>
-              <span className="text-spider-text-muted text-xs font-semibold text-right">Score</span>
-              <span className="text-spider-text-muted text-xs font-semibold text-right">Time</span>
-            </div>
-            {leaderboardData.map(entry => (
-              <div
-                key={entry.rank}
-                className="grid grid-cols-4 items-center px-3 py-2 transition-colors hover:bg-white/[0.02]"
-                style={{
-                  background: entry.self ? 'rgba(204,26,26,0.12)' : 'transparent',
-                  borderBottom: entry.rank < leaderboardData.length ? '1px solid #1e1e3a' : 'none',
-                }}
-              >
-                <RankIndicator rank={entry.rank} />
-                <div className="flex items-center gap-1.5 col-span-1 min-w-0">
-                  <div
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ background: entry.dot, boxShadow: `0 0 4px ${entry.dot}` }}
-                  />
-                  <span className={`text-xs truncate ${entry.self ? 'text-white font-semibold' : 'text-spider-text-dim'}`}>
-                    {entry.name}
-                  </span>
-                </div>
-                <span className={`text-xs text-right font-mono font-semibold ${entry.self ? 'text-spider-red' : 'text-spider-text'}`}>
-                  {entry.score}
-                </span>
-                <span className="text-spider-text-muted text-xs text-right font-mono">{entry.time}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Contest Status */}
-        <div className="px-4 pt-4 pb-4">
-          <div className="flex items-center justify-between">
-            <span className="text-white font-bold text-xs font-display tracking-widest uppercase">Contest Status</span>
-            <div className="flex items-center gap-2">
-              <div className="live-dot" />
-              <span className="text-spider-green text-xs font-semibold">Live</span>
-              <TrendingUp className="w-3.5 h-3.5 text-spider-green" />
-            </div>
-          </div>
+      {/* Editor container */}
+      <div
+        className="flex-1 relative overflow-hidden"
+        style={{
+          backgroundImage: `url("${WEB_BACKGROUNDS[webBgIndex]}")`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        <div className="absolute inset-0 bg-black/30 z-0" />
+        <div className="absolute inset-0 z-10 border-b-4 border-black">
+          <Editor
+            height="100%"
+            language={selectedLang === 'cpp' ? 'cpp' : selectedLang === 'c' ? 'c' : selectedLang}
+            value={codes[selectedLang]}
+            onChange={handleEditorChange}
+            onMount={handleEditorDidMount}
+            options={{
+              fontSize: 13,
+              fontFamily: "'Fira Code', 'Courier New', monospace",
+              lineNumbers: 'on',
+              roundedSelection: true,
+              scrollBeyondLastLine: false,
+              readOnly: false,
+              automaticLayout: true,
+              minimap: { enabled: false },
+              padding: { top: 12, bottom: 12 },
+            }}
+          />
         </div>
       </div>
-    </aside>
+
+      {/* Control Actions & Comic Explosion Status */}
+      <div className="bg-[#fcf8f0] p-4 flex flex-col md:flex-row md:items-center justify-between border-t-2 border-black flex-shrink-0 relative overflow-hidden select-none min-h-[140px] comic-halftone">
+        {/* Buttons on the Left */}
+        <div className="flex flex-col gap-2 z-10">
+          <button className="comic-btn-red flex items-center justify-center gap-2 px-6 py-2 rounded-none cursor-pointer text-base uppercase">
+            <Play className="w-4 h-4 fill-current" />
+            Run Code
+          </button>
+          <button className="comic-btn-blue flex items-center justify-center gap-2 px-6 py-2 rounded-none cursor-pointer text-base uppercase">
+            <Send className="w-4 h-4" />
+            Submit Code
+          </button>
+          <div className="flex items-center gap-2 text-gray-500 font-mono text-[10px] mt-0.5 ml-1">
+            <div className={`w-1.5 h-1.5 rounded-full ${isSaved ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
+            {isSaved ? 'Auto-saved' : 'Saving...'}
+          </div>
+        </div>
+
+        {/* Pow / Accepted Graphic */}
+        <div className="relative flex items-center justify-center h-28 w-64 md:absolute md:right-4 md:bottom-10 z-10 select-none pointer-events-none">
+          {/* Pow explosion */}
+          <div className="absolute transform -rotate-[6deg] -translate-x-6 scale-90">
+            <div className="bg-red-600 border-4 border-black px-4 py-2 font-display text-2xl font-bold tracking-widest text-yellow-300 shadow-[3px_3px_0px_#000] rounded-none">
+              POW
+            </div>
+          </div>
+          {/* Accepted Speech Bubble */}
+          <div className="absolute transform rotate-[4deg] translate-x-12 translate-y-2 scale-110 flex items-center">
+            <div className="bg-yellow-100 border-4 border-black px-6 py-3 font-display text-3xl font-bold tracking-wider text-green-600 shadow-[4px_4px_0px_#000] rounded-none flex items-center gap-2">
+              ACCEPTED
+              <span className="text-2xl">✔️</span>
+            </div>
+            {/* Specks and spiders around */}
+            <span className="absolute -top-4 right-1 text-xs">🕷️</span>
+            <span className="absolute -bottom-4 left-3 text-xs">🕷️</span>
+          </div>
+        </div>
+
+        {/* Yellow test result status banner at bottom-right */}
+        <div className="absolute bottom-0 right-0 bg-[#fde047] border-t-3 border-l-3 border-black px-4 py-1 text-black font-mono text-[10px] font-bold shadow-[-2px_-2px_0px_rgba(0,0,0,0.15)] z-20">
+          18/18 Test Cases - 37ms Runtime - 12.4MB Memory
+        </div>
+      </div>
+    </div>
   );
 }
