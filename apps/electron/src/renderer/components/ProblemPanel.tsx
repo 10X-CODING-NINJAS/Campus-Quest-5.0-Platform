@@ -2,14 +2,22 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Play, Send, Image, Maximize2, Settings, AlertTriangle } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 
-// Import background assets from src/Assets
-import bgBluePink from '../../Assets/Blue Pink web bg.png';
-import bgBlue from '../../Assets/Blue web bg.png';
-import bgGreen from '../../Assets/Green web bg.png';
-import bgOrange from '../../Assets/Orange web bg.png';
-import bgRed from '../../Assets/Red web bg.png';
+// Import background assets from Assets/Web folder
+import bgBluePink from '../../Assets/Web/Blue Pink web bg.png';
+import bgBlue from '../../Assets/Web/Blue web bg.png';
+import bgGreen from '../../Assets/Web/Green web bg.png';
+import bgOrange from '../../Assets/Web/Orange web bg.png';
+import bgRed from '../../Assets/Web/Red web bg.png';
 
-const BACKGROUNDS = [bgRed, bgBluePink, bgBlue, bgGreen, bgOrange];
+// Import background assets from Assets/Question folder
+import qBlack from '../../Assets/Question/Black Question bg.jpg';
+import qBlue from '../../Assets/Question/Blue Question bg.jpeg';
+import qGreen from '../../Assets/Question/Green Question bg.jpg';
+import qRed from '../../Assets/Question/Red Question bg.jpg';
+import qWhite from '../../Assets/Question/White Question bg.jpg';
+
+const WEB_BACKGROUNDS = [bgRed, bgBluePink, bgBlue, bgGreen, bgOrange];
+const QUESTION_BACKGROUNDS = [qBlack, qBlue, qGreen, qRed, qWhite];
 
 const C_TEMPLATE = `#include <stdio.h>
 #include <stdlib.h>
@@ -88,7 +96,9 @@ const LANGUAGES = [
 
 export default function ProblemPanel() {
   const [selectedLang, setSelectedLang] = useState('cpp');
-  const [bgIndex, setBgIndex] = useState(0);
+  const [webBgIndex, setWebBgIndex] = useState(0);
+  const [questionBgIndex, setQuestionBgIndex] = useState(() => Math.floor(Math.random() * QUESTION_BACKGROUNDS.length));
+  
   const [codes, setCodes] = useState<Record<string, string>>({
     c: C_TEMPLATE,
     cpp: CXX_TEMPLATE,
@@ -111,8 +121,18 @@ export default function ProblemPanel() {
     }
   };
 
-  const handleCycleBackground = () => {
-    setBgIndex(prev => (prev + 1) % BACKGROUNDS.length);
+  const handleCycleWebBackground = () => {
+    setWebBgIndex(prev => (prev + 1) % WEB_BACKGROUNDS.length);
+  };
+
+  const handleRandomizeQuestionBackground = () => {
+    let nextIndex = Math.floor(Math.random() * QUESTION_BACKGROUNDS.length);
+    if (QUESTION_BACKGROUNDS.length > 1) {
+      while (nextIndex === questionBgIndex) {
+        nextIndex = Math.floor(Math.random() * QUESTION_BACKGROUNDS.length);
+      }
+    }
+    setQuestionBgIndex(nextIndex);
   };
 
   const handleEditorDidMount = (_editor: any, monaco: any) => {
@@ -148,19 +168,38 @@ export default function ProblemPanel() {
         className="flex items-center gap-3 px-5 py-3 border-b flex-shrink-0"
         style={{ borderColor: '#1e1e3a', background: '#0e0e20' }}
       >
-        <button className="w-6 h-6 flex items-center justify-center rounded hover:bg-spider-bg-hover transition-colors cursor-pointer">
+        <button
+          onClick={handleRandomizeQuestionBackground}
+          className="w-6 h-6 flex items-center justify-center rounded hover:bg-spider-bg-hover transition-colors cursor-pointer"
+        >
           <ChevronLeft className="w-4 h-4 text-spider-text-dim" />
         </button>
         <span className="text-spider-text text-sm font-medium">Question 7 of 10</span>
-        <button className="w-6 h-6 flex items-center justify-center rounded hover:bg-spider-bg-hover transition-colors cursor-pointer">
+        <button
+          onClick={handleRandomizeQuestionBackground}
+          className="w-6 h-6 flex items-center justify-center rounded hover:bg-spider-bg-hover transition-colors cursor-pointer"
+        >
           <ChevronRight className="w-4 h-4 text-spider-text-dim" />
         </button>
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Problem Statement (Top) */}
-        <div className="h-[38%] flex-shrink-0 border-b border-spider-border flex flex-col overflow-hidden" style={{ background: '#0d0d1e' }}>
-          <div className="flex-1 overflow-y-auto p-4 select-text">
+        <div
+          className="h-[38%] flex-shrink-0 border-b border-spider-border flex flex-col overflow-hidden relative"
+          style={{
+            backgroundImage: `url("${QUESTION_BACKGROUNDS[questionBgIndex]}")`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          {/* Overlay to keep the text readable */}
+          <div
+            className="absolute inset-0"
+            style={{ background: 'rgba(13, 13, 30, 0.86)' }}
+          />
+
+          <div className="flex-1 overflow-y-auto p-4 select-text relative z-10">
             {/* Title */}
             <div className="mb-3">
               <div className="flex items-center gap-2 mb-1.5">
@@ -278,7 +317,7 @@ export default function ProblemPanel() {
 
             {/* Editor Controls */}
             <button
-              onClick={handleCycleBackground}
+              onClick={handleCycleWebBackground}
               className="w-7 h-7 flex items-center justify-center rounded hover:bg-spider-bg-hover transition-colors cursor-pointer text-spider-text-dim hover:text-white"
               title="Cycle Background Image"
             >
@@ -296,7 +335,7 @@ export default function ProblemPanel() {
           <div
             className="flex-1 relative overflow-hidden"
             style={{
-              backgroundImage: `url("${BACKGROUNDS[bgIndex]}")`,
+              backgroundImage: `url("${WEB_BACKGROUNDS[webBgIndex]}")`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
             }}
