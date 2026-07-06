@@ -42,7 +42,7 @@ export default function TopBar() {
   return (
     <header className="flex items-center h-14 px-4 border-b border-spider-border bg-spider-bg-sidebar flex-shrink-0 relative z-10 select-none">
       {/* Logo */}
-      <div className="flex items-center gap-2 w-52 flex-shrink-0">
+      <div className="flex items-center gap-2 w-60 flex-shrink-0">
         <div className="relative flex items-center justify-center w-8 h-8">
           <svg viewBox="0 0 32 32" className="w-8 h-8" fill="none">
             <circle cx="16" cy="16" r="15" fill="#cc1a1a" stroke="#ff2d2d" strokeWidth="0.5" />
