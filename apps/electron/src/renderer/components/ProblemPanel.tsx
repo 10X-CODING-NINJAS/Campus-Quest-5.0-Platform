@@ -15,7 +15,7 @@ export default function ProblemPanel({ questionNum, setQuestionNum }: ProblemPan
   };
 
   return (
-    <div className="w-80 flex-shrink-0 flex flex-col overflow-hidden bg-[#faf8f0] comic-panel p-4 text-black select-none comic-halftone">
+    <div className="w-[540px] h-[640px] flex-shrink-0 flex flex-col bg-[#faf8f0] comic-panel p-4 text-black select-none comic-halftone">
       
       {/* Question Nav */}
       <div className="flex items-center justify-between mb-4 bg-white border-3 border-black p-2 rounded-none shadow-[2px_2px_0px_#000]">

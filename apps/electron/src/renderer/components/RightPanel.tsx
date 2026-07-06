@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Play, Send, Maximize2, Settings } from 'lucide-react';
 import Editor from '@monaco-editor/react';
+import LeftSidebar from './LeftSidebar';
+import ComicModal from './ComicModal';
 
 // Import background assets from Assets/Web folder
 import bgBluePink from '../../Assets/Web/Blue Pink web bg.png';
@@ -108,6 +110,9 @@ export default function RightPanel({
     java: JAVA_TEMPLATE,
   });
 
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalStatus, setModalStatus] = useState<'ACCEPTED' | 'FAILED' | 'COMPILE_ERROR' | 'IDLE'>('IDLE');
+
   const activeLangConfig = LANGUAGES.find(l => l.id === selectedLang) || LANGUAGES[0];
 
   const handleEditorChange = (value: string | undefined) => {
@@ -151,86 +156,95 @@ export default function RightPanel({
   const webBgIndex = (questionNum - 1) % WEB_BACKGROUNDS.length;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0d0d1e] select-none relative comic-panel">
-      {/* Editor Header / Tab bar */}
-      <div className="flex items-center gap-3 px-4 py-2 bg-[#05050a] border-b-4 border-black flex-shrink-0">
-        <div className="relative">
-          <select
-            value={selectedLang}
-            onChange={(e) => setSelectedLang(e.target.value)}
-            className="bg-[#111128] text-white text-xs font-semibold font-mono rounded-none border-2 border-black px-3 py-1 outline-none cursor-pointer hover:bg-black/30 transition-colors appearance-none pr-8 relative"
-            style={{
-              backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right 8px center',
-              backgroundSize: '12px'
-            }}
-          >
-            {LANGUAGES.map(lang => (
-              <option key={lang.id} value={lang.id}>
-                {lang.id === 'cpp' ? 'C++17' : lang.name}
-              </option>
-            ))}
-          </select>
+    <div className="flex flex-col gap-4 w-[640px] h-fit">
+      {/* Editor Window */}
+      <div className="w-full h-[380px] flex flex-col overflow-hidden bg-[#0d0d1e] select-none relative comic-panel">
+        {/* Editor Header / Tab bar */}
+        <div className="flex items-center gap-3 px-4 py-2 bg-[#05050a] border-b-4 border-black flex-shrink-0">
+          <div className="relative">
+            <select
+              value={selectedLang}
+              onChange={(e) => setSelectedLang(e.target.value)}
+              className="bg-[#111128] text-white text-xs font-semibold font-mono rounded-none border-2 border-black px-3 py-1 outline-none cursor-pointer hover:bg-black/30 transition-colors appearance-none pr-8 relative"
+              style={{
+                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 8px center',
+                backgroundSize: '12px'
+              }}
+            >
+              {LANGUAGES.map(lang => (
+                <option key={lang.id} value={lang.id}>
+                  {lang.id === 'cpp' ? 'C++17' : lang.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="w-px h-4 bg-black/50" />
+
+          <div className="bg-stone-800 border-2 border-black text-white text-xs font-mono px-3 py-1 rounded-none shadow-[1px_1px_0px_#000]">
+            <span>{activeLangConfig.ext}</span>
+          </div>
+
+          <div className="flex-1" />
+
+          <button className="w-7 h-7 flex items-center justify-center rounded-none border border-transparent hover:border-black hover:bg-black/30 text-gray-400 hover:text-white transition-all cursor-pointer">
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+          <button className="w-7 h-7 flex items-center justify-center rounded-none border border-transparent hover:border-black hover:bg-black/30 text-gray-400 hover:text-white transition-all cursor-pointer">
+            <Settings className="w-3.5 h-3.5" />
+          </button>
         </div>
 
-        <div className="w-px h-4 bg-black/50" />
-
-        <div className="bg-stone-800 border-2 border-black text-white text-xs font-mono px-3 py-1 rounded-none shadow-[1px_1px_0px_#000]">
-          <span>{activeLangConfig.ext}</span>
+        {/* Editor container */}
+        <div
+          className="flex-1 relative overflow-hidden"
+          style={{
+            backgroundImage: `url("${WEB_BACKGROUNDS[webBgIndex]}")`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          <div className="absolute inset-0 bg-black/30 z-0" />
+          <div className="absolute inset-0 z-10">
+            <Editor
+              height="100%"
+              language={selectedLang === 'cpp' ? 'cpp' : selectedLang === 'c' ? 'c' : selectedLang}
+              value={codes[selectedLang]}
+              onChange={handleEditorChange}
+              onMount={handleEditorDidMount}
+              options={{
+                fontSize: 13,
+                fontFamily: "'Fira Code', 'Courier New', monospace",
+                lineNumbers: 'on',
+                roundedSelection: true,
+                scrollBeyondLastLine: false,
+                readOnly: false,
+                automaticLayout: true,
+                minimap: { enabled: false },
+                padding: { top: 12, bottom: 12 },
+              }}
+            />
+          </div>
         </div>
-
-        <div className="flex-1" />
-
-        <button className="w-7 h-7 flex items-center justify-center rounded-none border border-transparent hover:border-black hover:bg-black/30 text-gray-400 hover:text-white transition-all cursor-pointer">
-          <Maximize2 className="w-3.5 h-3.5" />
-        </button>
-        <button className="w-7 h-7 flex items-center justify-center rounded-none border border-transparent hover:border-black hover:bg-black/30 text-gray-400 hover:text-white transition-all cursor-pointer">
-          <Settings className="w-3.5 h-3.5" />
-        </button>
       </div>
 
-      {/* Editor container */}
-      <div
-        className="flex-1 relative overflow-hidden"
-        style={{
-          backgroundImage: `url("${WEB_BACKGROUNDS[webBgIndex]}")`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      >
-        <div className="absolute inset-0 bg-black/30 z-0" />
-        <div className="absolute inset-0 z-10 border-b-4 border-black">
-          <Editor
-            height="100%"
-            language={selectedLang === 'cpp' ? 'cpp' : selectedLang === 'c' ? 'c' : selectedLang}
-            value={codes[selectedLang]}
-            onChange={handleEditorChange}
-            onMount={handleEditorDidMount}
-            options={{
-              fontSize: 13,
-              fontFamily: "'Fira Code', 'Courier New', monospace",
-              lineNumbers: 'on',
-              roundedSelection: true,
-              scrollBeyondLastLine: false,
-              readOnly: false,
-              automaticLayout: true,
-              minimap: { enabled: false },
-              padding: { top: 12, bottom: 12 },
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Control Actions & Comic Explosion Status */}
-      <div className="bg-[#fcf8f0] p-4 flex flex-col md:flex-row md:items-center justify-between border-t-2 border-black flex-shrink-0 relative overflow-hidden select-none min-h-[140px] comic-halftone">
+      {/* Control Actions & Comic Explosion Status Card */}
+      <div className="w-full bg-[#fcf8f0] p-4 flex flex-col md:flex-row md:items-center justify-between flex-shrink-0 relative overflow-hidden select-none min-h-[140px] comic-panel comic-halftone">
         {/* Buttons on the Left */}
         <div className="flex flex-col gap-2 z-10">
-          <button className="comic-btn-red flex items-center justify-center gap-2 px-6 py-2 rounded-none cursor-pointer text-base uppercase">
+          <button 
+            onClick={() => { setModalStatus('FAILED'); setIsModalOpen(true); }}
+            className="comic-btn-red flex items-center justify-center gap-2 px-6 py-2 rounded-none cursor-pointer text-base uppercase"
+          >
             <Play className="w-4 h-4 fill-current" />
             Run Code
           </button>
-          <button className="comic-btn-blue flex items-center justify-center gap-2 px-6 py-2 rounded-none cursor-pointer text-base uppercase">
+          <button 
+            onClick={() => { setModalStatus('ACCEPTED'); setIsModalOpen(true); }}
+            className="comic-btn-blue flex items-center justify-center gap-2 px-6 py-2 rounded-none cursor-pointer text-base uppercase"
+          >
             <Send className="w-4 h-4" />
             Submit Code
           </button>
@@ -265,6 +279,19 @@ export default function RightPanel({
           18/18 Test Cases - 37ms Runtime - 12.4MB Memory
         </div>
       </div>
+      <LeftSidebar />
+
+      {/* Comic Book Alert Modal */}
+      <ComicModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        status={modalStatus}
+        passedCount={modalStatus === 'ACCEPTED' ? 18 : 6}
+        totalCount={18}
+        runtimeMs={37}
+        memoryMb={12.4}
+        message="Compilation Error: index 5 out of bounds for length 5"
+      />
     </div>
   );
 }

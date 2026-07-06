@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import TopBar from './components/TopBar';
-import LeftSidebar from './components/LeftSidebar';
 import ProblemPanel from './components/ProblemPanel';
 import RightPanel from './components/RightPanel';
 
@@ -15,17 +14,14 @@ export default function App() {
       <TopBar />
 
       {/* Main Workspace Layout */}
-      <div className="flex-1 flex overflow-hidden min-h-0 p-4 gap-4 comic-page-bg">
-        {/* Navigation & Progress */}
-        <LeftSidebar />
-
-        {/* Mission Brief panel (Center Column) */}
+      <div className="flex-1 flex overflow-auto p-6 gap-6 comic-page-bg items-start justify-center">
+        {/* Mission Brief panel (Left Column) */}
         <ProblemPanel 
           questionNum={questionNum}
           setQuestionNum={setQuestionNum}
         />
 
-        {/* Code Editor and Test cases panel (Right Column) */}
+        {/* Code Editor, Test cases and Team Stats panel (Right Column) */}
         <RightPanel 
           questionNum={questionNum}
           selectedLang={selectedLang}

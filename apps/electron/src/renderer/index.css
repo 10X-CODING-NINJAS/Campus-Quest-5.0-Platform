@@ -320,3 +320,7 @@ header .flex-shrink-0 {
   box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
 }
 
+.animate-spin-slow {
+  animation: spin 12s linear infinite;
+}
+
