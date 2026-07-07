@@ -42,14 +42,14 @@ export default function SpideySenseModal({ isOpen, onClose }: SpideySenseModalPr
           className="absolute inset-0 bg-black/60 backdrop-blur-[6px] cursor-pointer"
         />
 
-        {/* Modal Container - Zoomed in further (w-[92vw] max-w-[1150px]) */}
+        {/* Modal Container */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.8, opacity: 0 }}
           className="relative w-[92vw] max-w-[1150px] aspect-[1536/1024] bg-transparent z-10"
         >
-          {/* Base image (TINGLING ALERT) shaking erratically - scaled up to 1.15 to surround the usage image */}
+          {/* Base image (TINGLING ALERT) shaking erratically */}
           <div className="absolute inset-0 animate-erratic-shake-extreme pointer-events-none transform origin-center">
             <img 
               src={spideySenseBase} 
@@ -58,7 +58,7 @@ export default function SpideySenseModal({ isOpen, onClose }: SpideySenseModalPr
             />
           </div>
 
-          {/* Usage image (TEXT AND BUTTONS) layered statically on top at normal 1.0 scale */}
+          {/* Usage image (TEXT AND BUTTONS) layered statically on top */}
           <div className="absolute inset-0 pointer-events-none transform scale-100 origin-center">
             <img 
               src={spideySenseUsage} 
@@ -67,14 +67,16 @@ export default function SpideySenseModal({ isOpen, onClose }: SpideySenseModalPr
             />
           </div>
 
-          {/* Overlapping interactive buttons for Cancel and Use - completely transparent */}
+          {/* Overlapping interactive buttons - made visible for calibration */}
           {/* CANCEL BUTTON */}
           <button
             onClick={onClose}
             type="button"
-            className="absolute left-[36.9%] top-[59.2%] w-[11.2%] h-[4.8%] rounded-lg cursor-pointer bg-transparent border-0 outline-none hover:bg-white/5 active:bg-white/10 transition-all z-30"
+            className="absolute left-[36.9%] top-[59.2%] w-[11.2%] h-[4.8%] rounded-lg cursor-pointer bg-red-500/50 border-4 border-black text-black font-sans font-black text-xs hover:bg-red-500/70 transition-all z-30 flex items-center justify-center"
             title="CANCEL"
-          />
+          >
+            CANCEL OVERLAY
+          </button>
 
           {/* USE BUTTON */}
           <button
@@ -83,9 +85,11 @@ export default function SpideySenseModal({ isOpen, onClose }: SpideySenseModalPr
               onClose();
             }}
             type="button"
-            className="absolute left-[51.9%] top-[59.2%] w-[11.2%] h-[4.8%] rounded-lg cursor-pointer bg-transparent border-0 outline-none hover:bg-white/5 active:bg-white/10 transition-all z-30"
+            className="absolute left-[51.9%] top-[59.2%] w-[11.2%] h-[4.8%] rounded-lg cursor-pointer bg-green-500/50 border-4 border-black text-black font-sans font-black text-xs hover:bg-green-500/70 transition-all z-30 flex items-center justify-center"
             title="USE SPIDEY SENSE"
-          />
+          >
+            USE OVERLAY
+          </button>
         </motion.div>
       </div>
     </AnimatePresence>
