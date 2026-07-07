@@ -9,7 +9,11 @@ function WebIcon({ className = '' }: { className?: string }) {
   );
 }
 
-export default function LeftSidebar() {
+interface LeftSidebarProps {
+  onSpiderSenseClick?: () => void;
+}
+
+export default function LeftSidebar({ onSpiderSenseClick }: LeftSidebarProps) {
   return (
     <aside className="w-full bg-[#fdf6e2] comic-panel flex flex-col select-none p-5 text-black h-fit">
       {/* Team Stats Header */}
@@ -46,7 +50,10 @@ export default function LeftSidebar() {
         <div className="flex flex-col justify-center">
           <div className="grid grid-cols-3 gap-3">
             {/* Spider Sense */}
-            <div className="flex flex-col items-center justify-center bg-white/70 border-3 border-black p-2 rounded-none shadow-[3px_3px_0px_#000] hover:translate-y-[-1px] transition-transform cursor-pointer text-center">
+            <div 
+              onClick={onSpiderSenseClick}
+              className="flex flex-col items-center justify-center bg-white/70 border-3 border-black p-2 rounded-none shadow-[3px_3px_0px_#000] hover:translate-y-[-1px] transition-transform cursor-pointer text-center"
+            >
               <div className="w-9 h-9 rounded-none bg-[#ef4444] border-2 border-black flex items-center justify-center shadow-[1px_1px_0px_#000] text-white mb-1.5">
                 <WebIcon className="w-4.5 h-4.5" />
               </div>

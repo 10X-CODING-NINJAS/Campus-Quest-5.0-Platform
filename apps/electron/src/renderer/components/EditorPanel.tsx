@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Play, Check, Code, Terminal } from "lucide-react";
+import { Play, Check, Code, Terminal, Zap } from "lucide-react";
 import { Challenge, SubmissionResult } from "../types";
 
 interface EditorPanelProps {
@@ -10,6 +10,7 @@ interface EditorPanelProps {
   onChangeCode: (code: string) => void;
   onRunCode: () => void;
   onSubmitCode: () => void;
+  onUseSpideySense: () => void;
   submissionResult: SubmissionResult;
   consoleLogs: string[];
 }
@@ -21,6 +22,7 @@ export default function EditorPanel({
   onChangeCode,
   onRunCode,
   onSubmitCode,
+  onUseSpideySense,
   submissionResult,
   consoleLogs
 }: EditorPanelProps) {
@@ -117,15 +119,15 @@ export default function EditorPanel({
         />
       </div>
 
-      {/* 3. Action Buttons Section (Run & Submit) */}
-      <div className="grid grid-cols-2 gap-3.5">
+      {/* 3. Action Buttons Section (Run, Submit, & Spidey Sense) */}
+      <div className="grid grid-cols-3 gap-3">
         <button
           id="btn_run"
           onClick={onRunCode}
           disabled={submissionResult.status === "PENDING" || submissionResult.status === "RUNNING"}
-          className="bg-red-500 hover:bg-red-600 text-white font-sans font-black tracking-wide text-xs uppercase border-3 border-black rounded-none py-2.5 px-4 shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-2 transition cursor-pointer"
+          className="bg-red-500 hover:bg-red-600 text-white font-sans font-black tracking-wide text-xs uppercase border-3 border-black rounded-none py-2.5 px-3 shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer"
         >
-          <Play className="w-4 h-4 fill-white" />
+          <Play className="w-3.5 h-3.5 fill-white" />
           Run Code
         </button>
 
@@ -133,10 +135,19 @@ export default function EditorPanel({
           id="btn_submit"
           onClick={onSubmitCode}
           disabled={submissionResult.status === "PENDING" || submissionResult.status === "RUNNING"}
-          className="bg-sky-500 hover:bg-sky-600 text-white font-sans font-black tracking-wide text-xs uppercase border-3 border-black rounded-none py-2.5 px-4 shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-2 transition cursor-pointer"
+          className="bg-sky-500 hover:bg-sky-600 text-white font-sans font-black tracking-wide text-xs uppercase border-3 border-black rounded-none py-2.5 px-3 shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer"
         >
-          <Check className="w-4 h-4" />
+          <Check className="w-3.5 h-3.5" />
           Submit Code
+        </button>
+
+        <button
+          id="btn_spidey"
+          onClick={onUseSpideySense}
+          className="bg-yellow-400 hover:bg-yellow-500 text-black font-sans font-black tracking-wide text-xs uppercase border-3 border-black rounded-none py-2.5 px-3 shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer"
+        >
+          <Zap className="w-3.5 h-3.5 fill-current" />
+          Spidey Sense
         </button>
       </div>
 

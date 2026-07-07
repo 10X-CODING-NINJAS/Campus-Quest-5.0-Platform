@@ -2,6 +2,7 @@ import { useState } from 'react';
 import LeftSidebar from './LeftSidebar';
 import ComicModal from './ComicModal';
 import EditorPanel from './EditorPanel';
+import SpideySenseModal from './SpideySenseModal';
 import { Challenge, SubmissionResult } from '../types';
 
 const CXX_TEMPLATE = `#include <bits/stdc++.h>
@@ -69,6 +70,7 @@ export default function RightPanel({
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSpideyModalOpen, setIsSpideyModalOpen] = useState(false);
   const [modalStatus, setModalStatus] = useState<'ACCEPTED' | 'FAILED' | 'COMPILE_ERROR' | 'IDLE'>('IDLE');
 
   const handleEditorChange = (value: string) => {
@@ -137,12 +139,13 @@ export default function RightPanel({
         onChangeCode={handleEditorChange}
         onRunCode={handleRunCode}
         onSubmitCode={handleSubmitCode}
+        onUseSpideySense={() => setIsSpideyModalOpen(true)}
         submissionResult={submissionResult}
         consoleLogs={consoleLogs}
       />
 
       {/* Team Stats Panel Card */}
-      <LeftSidebar />
+      <LeftSidebar onSpiderSenseClick={() => setIsSpideyModalOpen(true)} />
 
       {/* Comic Book Alert Modal */}
       <ComicModal
@@ -154,6 +157,12 @@ export default function RightPanel({
         runtimeMs={submissionResult.runtimeMs || 0}
         memoryMb={submissionResult.memoryMb || 0}
         message={submissionResult.message}
+      />
+
+      {/* Spidey Sense usage modal */}
+      <SpideySenseModal
+        isOpen={isSpideyModalOpen}
+        onClose={() => setIsSpideyModalOpen(false)}
       />
     </div>
   );
