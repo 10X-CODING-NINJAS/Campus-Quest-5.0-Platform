@@ -90,6 +90,22 @@ export default function TopBar() {
         </div>
       </div>
 
+      {/* Submit Test Button */}
+      <button 
+        onClick={() => {
+          if (window.confirm("Are you sure you want to submit the test? This action cannot be undone.")) {
+            alert("Test submitted successfully!");
+            // In a real app, you would send the submission to the server and navigate away or close the app
+            if ((window as any).electronAPI) {
+              (window as any).electronAPI.close();
+            }
+          }
+        }}
+        className="mr-6 px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-[0px_0px_0px_0px_#000] transition-all comic-halftone"
+      >
+        SUBMIT TEST
+      </button>
+
       {/* Controls */}
       <div className="flex items-center gap-1.5 bg-[#1a1a2e] border-2 border-black rounded-lg p-1.5 shadow-[2px_2px_0px_0px_#000]">
         <button className="relative w-7 h-7 flex items-center justify-center rounded border border-transparent hover:border-black hover:bg-black/30 transition-all cursor-pointer">

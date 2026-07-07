@@ -2,6 +2,7 @@
 const electron = require("electron");
 const path = require("path");
 function createWindow() {
+  const isDev = !!process.env.VITE_DEV_SERVER_URL;
   const mainWindow = new electron.BrowserWindow({
     width: 1280,
     height: 820,
@@ -10,13 +11,17 @@ function createWindow() {
     frame: false,
     // Frameless window to utilize custom title bar buttons
     backgroundColor: "#080810",
+    kiosk: !isDev,
+    // Force full screen assessment mode ONLY in production
+    alwaysOnTop: !isDev,
+    // Prevent other windows from overlapping ONLY in production
     webPreferences: {
       preload: path.join(__dirname, "../preload/index.js"),
       contextIsolation: true,
       nodeIntegration: false
     }
   });
-  if (process.env.VITE_DEV_SERVER_URL) {
+  if (isDev) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
     mainWindow.loadFile(path.join(__dirname, "../../dist/index.html"));
@@ -33,6 +38,15 @@ function createWindow() {
   });
   electron.ipcMain.on("window-close", () => {
     mainWindow.close();
+  });
+  mainWindow.on("blur", () => {
+    console.warn("SECURITY VIOLATION: Window lost focus");
+    mainWindow.webContents.send("security-violation", "blur");
+  });
+  mainWindow.on("leave-full-screen", () => {
+    console.warn("SECURITY VIOLATION: Exited full screen");
+    mainWindow.webContents.send("security-violation", "leave-full-screen");
+    mainWindow.setKiosk(true);
   });
 }
 electron.app.whenReady().then(() => {
