@@ -37,6 +37,7 @@ module.exports = {
         sans: ['"Comic Neue"', 'Inter', 'sans-serif'],
         mono: ['"Fira Code"', 'Courier New', 'monospace'],
         digital: ['Orbitron', 'monospace'],
+        comic: ['Bangers', 'Outfit', 'sans-serif'],
       }
     },
   },

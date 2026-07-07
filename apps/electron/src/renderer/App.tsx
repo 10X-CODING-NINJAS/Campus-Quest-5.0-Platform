@@ -3,10 +3,11 @@ import TopBar from './components/TopBar';
 import ProblemPanel from './components/ProblemPanel';
 import RightPanel from './components/RightPanel';
 import LoginPage from './components/LoginPage';
+import Diagnostics from './components/Diagnostics';
 import fullBg from '../Assets/Full bg.png';
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'coding'>('login');
   const [questionNum, setQuestionNum] = useState(7);
   const [selectedLang, setSelectedLang] = useState('cpp');
   const [isSaved, setIsSaved] = useState(true);
@@ -24,8 +25,17 @@ export default function App() {
     }
   }, []);
 
-  if (!isLoggedIn) {
-    return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
+  if (currentScreen === 'login') {
+    return <LoginPage onLogin={() => setCurrentScreen('diagnostics')} />;
+  }
+
+  if (currentScreen === 'diagnostics') {
+    return (
+      <Diagnostics 
+        onProceed={() => setCurrentScreen('coding')} 
+        onBack={() => setCurrentScreen('login')}
+      />
+    );
   }
 
   return (
