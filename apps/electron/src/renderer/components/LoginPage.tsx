@@ -76,18 +76,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         <button
           onClick={handleSubmit}
           type="button"
-          className="absolute left-[49.7%] top-[77.4%] -translate-x-1/2 -translate-y-1/2 w-[10.5%] aspect-square rounded-full cursor-pointer z-20 outline-none group"
+          className="absolute left-[49.7%] top-[77.4%] -translate-x-1/2 -translate-y-1/2 w-[10.5%] aspect-square rounded-full cursor-pointer z-20 outline-none group bg-transparent"
           title="TRANSMIT CREDENTIALS"
         >
           {/* Subtle outer glowing circle on hover */}
-          <div className="absolute inset-0 rounded-full bg-red-600/0 group-hover:bg-red-600/10 group-hover:scale-105 group-active:scale-95 group-hover:shadow-[0_0_25px_rgba(239,68,68,0.7)] border-4 border-transparent group-hover:border-red-500/40 transition-all duration-200" />
-          
-          {/* Circular badge overlays the background circle nicely */}
-          <div className="absolute inset-[15%] rounded-full flex items-center justify-center transform -rotate-6 group-hover:rotate-6 group-hover:scale-110 transition-all duration-200">
-            <span className="font-display text-lg md:text-2xl lg:text-3xl text-white tracking-widest filter drop-shadow-[2px_2px_0px_#000] uppercase select-none">
-              GO!
-            </span>
-          </div>
+          <div className="absolute inset-0 rounded-full bg-transparent group-hover:bg-red-600/10 group-hover:scale-105 group-active:scale-95 group-hover:shadow-[0_0_25px_rgba(239,68,68,0.7)] border-4 border-transparent group-hover:border-red-500/40 transition-all duration-200" />
         </button>
 
       </div>
