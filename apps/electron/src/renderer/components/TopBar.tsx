@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Bell, Settings, Minus, Square, X } from 'lucide-react';
+import spiderLogo from '../../Assets/SpiderLogo.jpg';
 
 export default function TopBar() {
   const [seconds, setSeconds] = useState(77 * 60 + 42);
@@ -43,15 +44,8 @@ export default function TopBar() {
     <header className="flex items-center h-16 px-4 border-b-4 border-black bg-[#0d0d1e]/30 backdrop-blur-md flex-shrink-0 relative z-10 select-none comic-halftone">
       {/* Logo */}
       <div className="flex items-center gap-2.5 flex-shrink-0">
-        <div className="relative flex items-center justify-center w-10 h-10 border-2 border-black bg-red-600 rounded-full shadow-[2px_2px_0px_0px_#000]">
-          <svg viewBox="0 0 32 32" className="w-7 h-7" fill="none">
-            <circle cx="16" cy="16" r="15" fill="#cc1a1a" />
-            <path d="M16 4 C16 4 8 10 8 16 C8 22 16 28 16 28 C16 28 24 22 24 16 C24 10 16 4 16 4Z" fill="#000000" fillOpacity="0.4" />
-            <path d="M4 16 L28 16 M12 8 L20 24 M20 8 L12 24" stroke="#000000" strokeWidth="1.5" />
-            <circle cx="16" cy="16" r="4" fill="#cc1a1a" stroke="#000" strokeWidth="1.5" />
-            <ellipse cx="12" cy="12" rx="3.5" ry="2" fill="white" stroke="#000" strokeWidth="1" />
-            <ellipse cx="20" cy="12" rx="3.5" ry="2" fill="white" stroke="#000" strokeWidth="1" />
-          </svg>
+        <div className="relative flex items-center justify-center w-10 h-10 border-2 border-black rounded-full overflow-hidden shadow-[2px_2px_0px_0px_#000]">
+          <img src={spiderLogo} alt="Spider Logo" className="w-full h-full object-cover" />
         </div>
         <div>
           <div className="text-white comic-title text-xl tracking-wide leading-none text-red-500" style={{ WebkitTextStroke: '0.5px black' }}>
