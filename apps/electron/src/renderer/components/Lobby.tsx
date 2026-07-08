@@ -10,9 +10,11 @@ import TopBar from './TopBar';
 
 interface LobbyProps {
   onProceed: () => void;
+  teamName: string;
+  onTeamNameChange: (name: string) => void;
 }
 
-export default function Lobby({ onProceed }: LobbyProps) {
+export default function Lobby({ onProceed, teamName, onTeamNameChange }: LobbyProps) {
   const [timeLeft, setTimeLeft] = useState(120); // 2 minutes countdown
   const [teamsConnected, setTeamsConnected] = useState(12);
   const [isStarting, setIsStarting] = useState(false);
@@ -57,7 +59,7 @@ export default function Lobby({ onProceed }: LobbyProps) {
       className="h-screen w-screen bg-[#05050d] flex flex-col overflow-hidden select-none relative"
       style={{ backgroundImage: `url(${lobbyBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
     >
-      <TopBar isLobby={true} hideSubmit={true} />
+      <TopBar isLobby={true} hideSubmit={true} teamName={teamName} onTeamNameChange={onTeamNameChange} />
       {/* Halftone texture overlay for comic printed feel */}
       <div className="absolute inset-0 comic-halftone opacity-20 pointer-events-none z-0" />
 

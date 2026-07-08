@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import loginBg from '../../Assets/LoginPage.png';
 
 interface LoginPageProps {
-  onLogin: () => void;
+  onLogin: (teamName: string) => void;
 }
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
@@ -16,7 +16,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       setError('ALL FIELDS REQUIRED, HERO!');
       return;
     }
-    onLogin();
+    onLogin(teamName);
   };
 
   return (

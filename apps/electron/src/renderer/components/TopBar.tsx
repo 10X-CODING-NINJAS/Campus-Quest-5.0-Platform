@@ -6,9 +6,17 @@ interface TopBarProps {
   solidBg?: boolean;
   hideSubmit?: boolean;
   isLobby?: boolean;
+  teamName?: string;
+  onTeamNameChange?: (name: string) => void;
 }
 
-export default function TopBar({ solidBg = false, hideSubmit = false, isLobby = false }: TopBarProps) {
+export default function TopBar({
+  solidBg = false,
+  hideSubmit = false,
+  isLobby = false,
+  teamName = 'Team Earth-1610',
+  onTeamNameChange
+}: TopBarProps) {
   const [seconds, setSeconds] = useState(77 * 60 + 42);
   const [colonVisible, setColonVisible] = useState(true);
 
@@ -81,13 +89,19 @@ export default function TopBar({ solidBg = false, hideSubmit = false, isLobby = 
       <div className="flex items-center gap-2.5 mr-6 bg-black/40 border-2 border-black rounded-lg px-3 py-1 shadow-[2px_2px_0px_0px_#000]">
         <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-red-500 flex-shrink-0 bg-red-600">
           <img
-            src="https://images.pexels.com/photos/6985004/pexels-photo-6985004.jpeg?auto=compress&cs=tinysrgb&w=64&h=64&dpr=1"
+            src={spiderLogo}
             alt="Team avatar"
             className="w-full h-full object-cover"
           />
         </div>
-        <div className="text-left">
-          <div className="text-white text-xs font-bold font-sans tracking-wide">Team Earth-1610</div>
+        <div className="text-left flex flex-col">
+          <input
+            type="text"
+            value={teamName}
+            onChange={(e) => onTeamNameChange?.(e.target.value)}
+            placeholder="TEAM NAME"
+            className="bg-transparent text-white text-xs font-bold font-sans tracking-wide border-0 outline-none w-28 focus:bg-white/10 px-1 rounded transition-colors -ml-1 text-left uppercase"
+          />
           <div className="text-gray-400 text-[10px] font-mono italic">- We do this together.</div>
         </div>
       </div>

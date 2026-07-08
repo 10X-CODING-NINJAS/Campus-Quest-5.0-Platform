@@ -9,6 +9,7 @@ import fullBg from '../Assets/Full bg.png';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'lobby' | 'coding'>('login');
+  const [teamName, setTeamName] = useState('Team Earth-1610');
   const [questionNum, setQuestionNum] = useState(7);
   const [selectedLang, setSelectedLang] = useState('cpp');
   const [isSaved, setIsSaved] = useState(true);
@@ -27,7 +28,7 @@ export default function App() {
   }, []);
 
   if (currentScreen === 'login') {
-    return <LoginPage onLogin={() => setCurrentScreen('diagnostics')} />;
+    return <LoginPage onLogin={(name) => { setTeamName(name); setCurrentScreen('diagnostics'); }} />;
   }
 
   if (currentScreen === 'diagnostics') {
@@ -43,6 +44,8 @@ export default function App() {
     return (
       <Lobby 
         onProceed={() => setCurrentScreen('coding')}
+        teamName={teamName}
+        onTeamNameChange={setTeamName}
       />
     );
   }
@@ -72,7 +75,7 @@ export default function App() {
       )}
 
       {/* Custom Header with controls & timer */}
-      <TopBar />
+      <TopBar teamName={teamName} onTeamNameChange={setTeamName} />
 
       {/* Main Workspace Layout */}
       <div className="flex-1 flex overflow-auto p-6 gap-6 items-start justify-center">
