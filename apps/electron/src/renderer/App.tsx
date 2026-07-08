@@ -4,10 +4,11 @@ import ProblemPanel from './components/ProblemPanel';
 import RightPanel from './components/RightPanel';
 import LoginPage from './components/LoginPage';
 import Diagnostics from './components/Diagnostics';
+import Lobby from './components/Lobby';
 import fullBg from '../Assets/Full bg.png';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'coding'>('login');
+  const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'lobby' | 'coding'>('login');
   const [questionNum, setQuestionNum] = useState(7);
   const [selectedLang, setSelectedLang] = useState('cpp');
   const [isSaved, setIsSaved] = useState(true);
@@ -32,8 +33,16 @@ export default function App() {
   if (currentScreen === 'diagnostics') {
     return (
       <Diagnostics 
-        onProceed={() => setCurrentScreen('coding')} 
+        onProceed={() => setCurrentScreen('lobby')} 
         onBack={() => setCurrentScreen('login')}
+      />
+    );
+  }
+
+  if (currentScreen === 'lobby') {
+    return (
+      <Lobby 
+        onProceed={() => setCurrentScreen('coding')}
       />
     );
   }
