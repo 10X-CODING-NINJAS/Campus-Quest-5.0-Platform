@@ -1,35 +1,21 @@
 import { useState, useEffect } from 'react';
-import { Bell, Settings, Minus, Square, X } from 'lucide-react';
+import { Bell, Settings, Minus, Square, X, Play, Pause } from 'lucide-react';
 import spiderLogo from '../../Assets/SpiderLogo.jpg';
 
-interface TopBarProps {
-  solidBg?: boolean;
-  hideSubmit?: boolean;
-  isLobby?: boolean;
-  teamName?: string;
-  onTeamNameChange?: (name: string) => void;
-  onHintsPage?: boolean;
-  onToggleHints?: () => void;
-}
-
-export default function TopBar({
-  solidBg = false,
-  hideSubmit = false,
-  isLobby = false,
-  teamName = 'Team Earth-1610',
-  onTeamNameChange,
-  onHintsPage = false,
-  onToggleHints
-}: TopBarProps) {
+export default function TopBar({ isPaused = false }: { isPaused?: boolean }) {
   const [seconds, setSeconds] = useState(77 * 60 + 42);
   const [colonVisible, setColonVisible] = useState(true);
+  const [isRunning, setIsRunning] = useState(true);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setSeconds(s => (s > 0 ? s - 1 : 0));
-    }, 1000);
+    let interval: any;
+    if (isRunning && !isPaused) {
+      interval = setInterval(() => {
+        setSeconds(s => (s > 0 ? s - 1 : 0));
+      }, 1000);
+    }
     return () => clearInterval(interval);
-  }, []);
+  }, [isRunning, isPaused]);
 
   useEffect(() => {
     const blink = setInterval(() => setColonVisible(v => !v), 500);
@@ -90,7 +76,7 @@ export default function TopBar({
       <div className="flex-1" />
 
       {/* Team Info */}
-      <div className="flex items-center gap-2.5 mr-6 bg-black/40 border-2 border-black rounded-lg px-3 py-1 shadow-[2px_2px_0px_0px_#000]">
+      <div className="flex items-center gap-2 mr-3 bg-black/40 border-2 border-black rounded-lg px-2 py-1 shadow-[2px_2px_0px_0px_#000]">
         <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-red-500 flex-shrink-0 bg-red-600">
           <img
             src={spiderLogo}
@@ -98,48 +84,33 @@ export default function TopBar({
             className="w-full h-full object-cover"
           />
         </div>
-        <div className="text-left flex flex-col">
-          <input
-            type="text"
-            value={teamName}
-            onChange={(e) => onTeamNameChange?.(e.target.value)}
-            placeholder="TEAM NAME"
-            className="bg-transparent text-white text-xs font-bold font-sans tracking-wide border-0 outline-none w-28 focus:bg-white/10 px-1 rounded transition-colors -ml-1 text-left uppercase"
-          />
-          <div className="text-gray-400 text-[10px] font-mono italic">- We do this together.</div>
+        <div className="text-left hidden lg:block">
+          <div className="text-white text-xs font-bold font-sans tracking-wide whitespace-nowrap">Team Earth-1610</div>
+          <div className="text-gray-400 text-[10px] font-mono italic whitespace-nowrap">- We do this together.</div>
         </div>
       </div>
 
-      {/* 3D Hints Page Button */}
-      {!isLobby && onToggleHints && (
-        <button
-          onClick={onToggleHints}
-          className={`mr-4 px-5 py-2 font-bold rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-[0px_0px_0px_0px_#000] transition-all comic-halftone ${
-            onHintsPage 
-              ? 'bg-yellow-400 hover:bg-yellow-300 text-black' 
-              : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-          }`}
-        >
-          {onHintsPage ? 'BACK TO CODE' : 'VIEW 3D HINTS'}
-        </button>
-      )}
+      {/* Mission Control Title */}
+      <div className="flex-1 flex justify-center">
+        <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400 tracking-widest comic-title uppercase transform -skew-x-6 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+          MISSION CONTROL
+        </h1>
+      </div>
 
       {/* Submit Test Button */}
-      {!hideSubmit && (
-        <button 
-          onClick={() => {
-            if (window.confirm("Are you sure you want to submit the test? This action cannot be undone.")) {
-              alert("Test submitted successfully!");
-              if ((window as any).electronAPI) {
-                (window as any).electronAPI.close();
-              }
+      <button 
+        onClick={() => {
+          if (window.confirm("Are you sure you want to submit the test? This action cannot be undone.")) {
+            alert("Test submitted successfully!");
+            if ((window as any).electronAPI) {
+              (window as any).electronAPI.close();
             }
-          }}
-          className="mr-6 px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-[0px_0px_0px_0px_#000] transition-all comic-halftone"
-        >
-          SUBMIT TEST
-        </button>
-      )}
+          }
+        }}
+        className="mr-3 px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-[0px_0px_0px_0px_#000] transition-all comic-halftone whitespace-nowrap text-sm"
+      >
+        SUBMIT TEST
+      </button>
 
       {/* Controls */}
       <div className="flex items-center gap-1.5 bg-[#1a1a2e] border-2 border-black rounded-lg p-1.5 shadow-[2px_2px_0px_0px_#000]">

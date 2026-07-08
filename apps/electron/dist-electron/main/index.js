@@ -11,8 +11,10 @@ function createWindow() {
     frame: false,
     // Frameless window to utilize custom title bar buttons
     backgroundColor: "#080810",
+    fullscreen: true,
+    // Force full screen on open
     kiosk: !isDev,
-    // Force full screen assessment mode ONLY in production
+    // Force kiosk mode ONLY in production
     alwaysOnTop: !isDev,
     // Prevent other windows from overlapping ONLY in production
     webPreferences: {

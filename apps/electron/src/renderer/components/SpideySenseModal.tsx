@@ -67,29 +67,29 @@ export default function SpideySenseModal({ isOpen, onClose }: SpideySenseModalPr
             />
           </div>
 
-          {/* Overlapping interactive buttons - made visible for calibration */}
-          {/* CANCEL BUTTON */}
-          <button
-            onClick={onClose}
-            type="button"
-            className="absolute left-[36.9%] top-[59.2%] w-[11.2%] h-[4.8%] rounded-lg cursor-pointer bg-red-500/50 border-4 border-black text-black font-sans font-black text-xs hover:bg-red-500/70 transition-all z-30 flex items-center justify-center"
-            title="CANCEL"
-          >
-            CANCEL OVERLAY
-          </button>
-
-          {/* USE BUTTON */}
-          <button
-            onClick={() => {
-              alert("SPIDEY SENSE DEPLOYED!");
-              onClose();
-            }}
-            type="button"
-            className="absolute left-[51.9%] top-[59.2%] w-[11.2%] h-[4.8%] rounded-lg cursor-pointer bg-green-500/50 border-4 border-black text-black font-sans font-black text-xs hover:bg-green-500/70 transition-all z-30 flex items-center justify-center"
-            title="USE SPIDEY SENSE"
-          >
-            USE OVERLAY
-          </button>
+          {/* MASSIVE INVISIBLE HITBOXES TO COVER THE BAKED-IN BUTTONS */}
+          {/* The visual buttons are located between the text (at 59%) and the bottom of the content (at 78%). */}
+          <div className="absolute top-[65%] left-[20%] right-[20%] h-[13%] flex gap-[2%] z-30">
+            {/* CANCEL HITBOX */}
+            <button
+              onClick={onClose}
+              type="button"
+              className="flex-1 h-full cursor-pointer bg-transparent"
+              title="CANCEL"
+              aria-label="Cancel"
+            />
+            {/* USE BUTTON HITBOX */}
+            <button
+              onClick={() => {
+                alert("SPIDEY SENSE DEPLOYED!");
+                onClose();
+              }}
+              type="button"
+              className="flex-[1.2] h-full cursor-pointer bg-transparent"
+              title="USE SPIDEY SENSE"
+              aria-label="Use Spidey Sense"
+            />
+          </div>
         </motion.div>
       </div>
     </AnimatePresence>
