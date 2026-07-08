@@ -92,9 +92,49 @@ export default function HintsPage() {
         },
         labelLayerId
       );
+
+      // Identify road layers
+      const styleLayers = map.getStyle().layers;
+      const roadLayers = styleLayers?.filter(layer => 
+        layer.type === 'line' && 
+        ((layer as any)['source-layer'] === 'transportation' || layer.id.includes('road') || layer.id.includes('highway'))
+      ) || [];
+
+      // Color all roads red
+      roadLayers.forEach(layer => {
+        try {
+          map.setPaintProperty(layer.id, 'line-color', '#ff003b');
+        } catch (e) {
+          // Ignored
+        }
+      });
+
+      // Animate road opacity to create pulsating red glow
+      const animateRoads = () => {
+        const time = Date.now() / 1000;
+        // Pulsate opacity between 0.3 and 0.95
+        const opacity = 0.3 + Math.abs(Math.sin(time * 2.5)) * 0.65;
+
+        roadLayers.forEach(layer => {
+          try {
+            map.setPaintProperty(layer.id, 'line-opacity', opacity);
+          } catch (e) {
+            // Ignored
+          }
+        });
+
+        animId = requestAnimationFrame(animateRoads);
+      };
+
+      animateRoads();
     });
 
+    let animId: number;
+
     return () => {
+      if (animId) {
+        cancelAnimationFrame(animId);
+      }
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -103,9 +143,12 @@ export default function HintsPage() {
   }, []);
 
   return (
-    <div className="w-full h-full relative flex flex-col bg-[#05050d]">
+    <div className="w-full h-full relative bg-[#05050d]" id="hints-page-root">
+      {/* Mapbox container filling the viewport */}
+      <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" id="map-libre-container" />
+
       {/* HUD Info Card overlay */}
-      <div className="absolute top-6 left-6 z-10 bg-black/80 border-4 border-black p-4 max-w-sm shadow-[4px_4px_0px_#000] text-white comic-halftone">
+      <div className="absolute top-6 left-6 z-10 bg-black/80 border-4 border-black p-4 max-w-sm shadow-[4px_4px_0px_#000] text-white comic-halftone pointer-events-none">
         <div className="bg-yellow-400 text-black border-2 border-black font-comic text-sm px-2.5 py-0.5 transform -rotate-1 shadow-[2px_2px_0px_#000] inline-block mb-3 select-none">
           NYC 3D ANOMALY SENSOR GRID
         </div>
@@ -116,9 +159,6 @@ export default function HintsPage() {
           Calibrating dimensional anchors across Manhattan. Standard Earth-1610 buildings heights mapped to extrusions. Drag to pan, use right-click/Ctrl to rotate pitch.
         </p>
       </div>
-
-      {/* Mapbox container filling the viewport */}
-      <div ref={mapContainerRef} className="flex-1 w-full h-full" id="map-libre-container" />
     </div>
   );
 }
