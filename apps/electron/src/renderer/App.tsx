@@ -5,10 +5,11 @@ import RightPanel from './components/RightPanel';
 import LoginPage from './components/LoginPage';
 import Diagnostics from './components/Diagnostics';
 import Lobby from './components/Lobby';
+import HintsPage from './components/HintsPage';
 import fullBg from '../Assets/Full bg.png';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'lobby' | 'coding'>('login');
+  const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints'>('login');
   const [teamName, setTeamName] = useState('Team Earth-1610');
   const [questionNum, setQuestionNum] = useState(7);
   const [selectedLang, setSelectedLang] = useState('cpp');
@@ -75,25 +76,36 @@ export default function App() {
       )}
 
       {/* Custom Header with controls & timer */}
-      <TopBar teamName={teamName} onTeamNameChange={setTeamName} />
+      <TopBar 
+        teamName={teamName} 
+        onTeamNameChange={setTeamName} 
+        onHintsPage={currentScreen === 'hints'}
+        onToggleHints={() => setCurrentScreen(prev => prev === 'hints' ? 'coding' : 'hints')}
+      />
 
       {/* Main Workspace Layout */}
-      <div className="flex-1 flex overflow-auto p-6 gap-6 items-start justify-center">
-        {/* Mission Brief panel (Left Column) */}
-        <ProblemPanel 
-          questionNum={questionNum}
-          setQuestionNum={setQuestionNum}
-        />
+      {currentScreen === 'hints' ? (
+        <div className="flex-1 w-full h-full relative">
+          <HintsPage />
+        </div>
+      ) : (
+        <div className="flex-1 flex overflow-auto p-6 gap-6 items-start justify-center">
+          {/* Mission Brief panel (Left Column) */}
+          <ProblemPanel 
+            questionNum={questionNum}
+            setQuestionNum={setQuestionNum}
+          />
 
-        {/* Code Editor, Test cases and Team Stats panel (Right Column) */}
-        <RightPanel 
-          questionNum={questionNum}
-          selectedLang={selectedLang}
-          setSelectedLang={setSelectedLang}
-          isSaved={isSaved}
-          setIsSaved={setIsSaved}
-        />
-      </div>
+          {/* Code Editor, Test cases and Team Stats panel (Right Column) */}
+          <RightPanel 
+            questionNum={questionNum}
+            selectedLang={selectedLang}
+            setSelectedLang={setSelectedLang}
+            isSaved={isSaved}
+            setIsSaved={setIsSaved}
+          />
+        </div>
+      )}
     </div>
   );
 }

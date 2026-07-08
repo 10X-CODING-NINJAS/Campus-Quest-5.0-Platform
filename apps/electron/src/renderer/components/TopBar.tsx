@@ -8,6 +8,8 @@ interface TopBarProps {
   isLobby?: boolean;
   teamName?: string;
   onTeamNameChange?: (name: string) => void;
+  onHintsPage?: boolean;
+  onToggleHints?: () => void;
 }
 
 export default function TopBar({
@@ -15,7 +17,9 @@ export default function TopBar({
   hideSubmit = false,
   isLobby = false,
   teamName = 'Team Earth-1610',
-  onTeamNameChange
+  onTeamNameChange,
+  onHintsPage = false,
+  onToggleHints
 }: TopBarProps) {
   const [seconds, setSeconds] = useState(77 * 60 + 42);
   const [colonVisible, setColonVisible] = useState(true);
@@ -105,6 +109,20 @@ export default function TopBar({
           <div className="text-gray-400 text-[10px] font-mono italic">- We do this together.</div>
         </div>
       </div>
+
+      {/* 3D Hints Page Button */}
+      {!isLobby && onToggleHints && (
+        <button
+          onClick={onToggleHints}
+          className={`mr-4 px-5 py-2 font-bold rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-[0px_0px_0px_0px_#000] transition-all comic-halftone ${
+            onHintsPage 
+              ? 'bg-yellow-400 hover:bg-yellow-300 text-black' 
+              : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+          }`}
+        >
+          {onHintsPage ? 'BACK TO CODE' : 'VIEW 3D HINTS'}
+        </button>
+      )}
 
       {/* Submit Test Button */}
       {!hideSubmit && (
