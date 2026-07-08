@@ -38,11 +38,20 @@ export default function HintsPage() {
         });
       }
 
-      // Remove any existing building layers from the basemap so they are not transparently visible
+      // Remove any existing building, road, and label/symbol layers from the basemap so they are not visible
       const styleLayers = map.getStyle().layers;
       if (styleLayers) {
         styleLayers.forEach(layer => {
-          if (layer.id.includes('building')) {
+          const isBuilding = layer.id.includes('building');
+          const isRoad = layer.type === 'line' && 
+            ((layer as any)['source-layer'] === 'transportation' || 
+             layer.id.includes('road') || 
+             layer.id.includes('highway') || 
+             layer.id.includes('path') || 
+             layer.id.includes('rail'));
+          const isLabel = layer.type === 'symbol';
+
+          if ((isBuilding || isRoad || isLabel) && layer.id !== 'glowing-roads-casing' && layer.id !== 'glowing-roads-overlay') {
             try {
               map.removeLayer(layer.id);
             } catch (e) {
@@ -50,18 +59,6 @@ export default function HintsPage() {
             }
           }
         });
-      }
-
-      // Find the first label layer ID to insert 3D buildings beneath it
-      const layers = map.getStyle().layers;
-      let labelLayerId = '';
-      if (layers) {
-        for (let i = 0; i < layers.length; i++) {
-          if (layers[i].type === 'symbol' && layers[i].layout && (layers[i].layout as any)['text-field']) {
-            labelLayerId = layers[i].id;
-            break;
-          }
-        }
       }
 
       // Add 3D building extrusions layer (opaque, solid colors)
@@ -90,7 +87,7 @@ export default function HintsPage() {
               15,
               0,
               15.05,
-              ['get', 'render_height']
+              ['*', ['get', 'render_height'], 2.5]
             ],
             'fill-extrusion-base': [
               'interpolate',
@@ -99,12 +96,11 @@ export default function HintsPage() {
               15,
               0,
               15.05,
-              ['get', 'render_min_height']
+              ['*', ['get', 'render_min_height'], 2.5]
             ],
             'fill-extrusion-opacity': 1.0 // Fully opaque solid buildings
           }
-        },
-        labelLayerId
+        }
       );
 
       // Add glowing roads casing layer using vector tiles (follows actual curved street geometries)
