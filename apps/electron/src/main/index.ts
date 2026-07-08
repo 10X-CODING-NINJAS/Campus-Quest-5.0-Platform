@@ -11,7 +11,8 @@ function createWindow() {
     minHeight: 640,
     frame: false, // Frameless window to utilize custom title bar buttons
     backgroundColor: '#080810',
-    kiosk: !isDev, // Force full screen assessment mode ONLY in production
+    fullscreen: true, // Force full screen on open
+    kiosk: !isDev, // Force kiosk mode ONLY in production
     alwaysOnTop: !isDev, // Prevent other windows from overlapping ONLY in production
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),

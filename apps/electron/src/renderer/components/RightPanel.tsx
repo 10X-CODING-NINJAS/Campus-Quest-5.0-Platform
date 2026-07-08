@@ -50,23 +50,44 @@ function main() {
 main();
 `;
 
+const JAVA_TEMPLATE = `import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        if (!scanner.hasNextInt()) return;
+        int n = scanner.nextInt();
+        int m = scanner.nextInt();
+        
+        // Write your Java 21 code here
+        
+        scanner.close();
+    }
+}
+`;
+
 interface RightPanelProps {
   questionNum: number;
   selectedLang: string;
   setSelectedLang: (lang: string) => void;
   isSaved: boolean;
   setIsSaved: React.Dispatch<React.SetStateAction<boolean>>;
+  powerupCounts: { SPIDER_SENSE: number; WEB_FLUID: number; SUIT_TECH: number };
+  onUsePowerup: (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => void;
 }
 
 export default function RightPanel({
   selectedLang,
   setSelectedLang,
-  setIsSaved
+  setIsSaved,
+  powerupCounts,
+  onUsePowerup
 }: RightPanelProps) {
   const [codes, setCodes] = useState<Record<string, string>>({
     cpp: CXX_TEMPLATE,
     python: PY_TEMPLATE,
     javascript: JS_TEMPLATE,
+    java: JAVA_TEMPLATE,
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -74,7 +95,7 @@ export default function RightPanel({
   const [modalStatus, setModalStatus] = useState<'ACCEPTED' | 'FAILED' | 'COMPILE_ERROR' | 'IDLE'>('IDLE');
 
   const handleEditorChange = (value: string) => {
-    const currentLang = selectedLang === 'javascript' ? 'javascript' : selectedLang === 'python' ? 'python' : 'cpp';
+    const currentLang = selectedLang === 'javascript' ? 'javascript' : selectedLang === 'python' ? 'python' : selectedLang === 'java' ? 'java' : 'cpp';
     setCodes(prev => ({
       ...prev,
       [currentLang]: value,
@@ -93,7 +114,7 @@ export default function RightPanel({
     setIsModalOpen(true);
   };
 
-  const mappedLang = selectedLang === 'javascript' ? 'javascript' : selectedLang === 'python' ? 'python' : 'cpp';
+  const mappedLang = selectedLang === 'javascript' ? 'javascript' : selectedLang === 'python' ? 'python' : selectedLang === 'java' ? 'java' : 'cpp';
   const currentCode = codes[mappedLang] || '';
 
   const activeChallenge: Challenge = {
@@ -145,7 +166,11 @@ export default function RightPanel({
       />
 
       {/* Team Stats Panel Card */}
-      <LeftSidebar onSpiderSenseClick={() => setIsSpideyModalOpen(true)} />
+      <LeftSidebar 
+        onSpiderSenseClick={() => setIsSpideyModalOpen(true)} 
+        powerupCounts={powerupCounts}
+        onUsePowerup={onUsePowerup}
+      />
 
       {/* Comic Book Alert Modal */}
       <ComicModal
