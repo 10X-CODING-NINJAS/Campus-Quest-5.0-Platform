@@ -57,7 +57,7 @@ export default function Lobby({ onProceed }: LobbyProps) {
       className="h-screen w-screen bg-[#05050d] flex flex-col overflow-hidden select-none relative"
       style={{ backgroundImage: `url(${lobbyBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
     >
-      <TopBar solidBg={true} hideSubmit={true} />
+      <TopBar isLobby={true} hideSubmit={true} />
       {/* Halftone texture overlay for comic printed feel */}
       <div className="absolute inset-0 comic-halftone opacity-20 pointer-events-none z-0" />
 

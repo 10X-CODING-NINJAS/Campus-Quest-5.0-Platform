@@ -5,9 +5,10 @@ import spiderLogo from '../../Assets/SpiderLogo.jpg';
 interface TopBarProps {
   solidBg?: boolean;
   hideSubmit?: boolean;
+  isLobby?: boolean;
 }
 
-export default function TopBar({ solidBg = false, hideSubmit = false }: TopBarProps) {
+export default function TopBar({ solidBg = false, hideSubmit = false, isLobby = false }: TopBarProps) {
   const [seconds, setSeconds] = useState(77 * 60 + 42);
   const [colonVisible, setColonVisible] = useState(true);
 
@@ -46,7 +47,7 @@ export default function TopBar({ solidBg = false, hideSubmit = false }: TopBarPr
   };
 
   return (
-    <header className={`flex items-center h-16 px-4 border-b-4 border-black ${solidBg ? 'bg-[#0d0d1e]' : 'bg-[#0d0d1e]/30 backdrop-blur-md'} flex-shrink-0 relative z-10 select-none comic-halftone`}>
+    <header className={`flex items-center ${isLobby ? 'h-20 bg-black' : `h-16 ${solidBg ? 'bg-[#0d0d1e]' : 'bg-[#0d0d1e]/30 backdrop-blur-md'}`} px-4 border-b-4 border-black flex-shrink-0 relative z-10 select-none comic-halftone`}>
       {/* Logo */}
       <div className="flex items-center gap-2.5 flex-shrink-0">
         <div className="relative flex items-center justify-center w-10 h-10 border-2 border-black rounded-full overflow-hidden shadow-[2px_2px_0px_0px_#000]">
@@ -65,12 +66,14 @@ export default function TopBar({ solidBg = false, hideSubmit = false }: TopBarPr
       <div className="flex-1" />
 
       {/* Center Mission Time Digital Panel */}
-      <div className="absolute left-1/2 transform -translate-x-1/2 top-0 flex flex-col items-center bg-[#05050a] border-x-4 border-b-4 border-black px-8 py-1.5 shadow-[0px_4px_0px_0px_rgba(0,0,0,0.15)] rounded-b-xl z-20">
-        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em] mb-0.5">MISSION TIME</span>
-        <div className="font-digital text-red-500 font-bold text-2xl tracking-widest leading-none drop-shadow-[0_0_8px_#ef4444]">
-          {h}<span className={colonVisible ? 'opacity-100' : 'opacity-20'}>:</span>{m}<span className={colonVisible ? 'opacity-100' : 'opacity-20'}>:</span>{s}
+      {!isLobby && (
+        <div className="absolute left-1/2 transform -translate-x-1/2 top-0 flex flex-col items-center bg-[#05050a] border-x-4 border-b-4 border-black px-8 py-1.5 shadow-[0px_4px_0px_0px_rgba(0,0,0,0.15)] rounded-b-xl z-20">
+          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em] mb-0.5">MISSION TIME</span>
+          <div className="font-digital text-red-500 font-bold text-2xl tracking-widest leading-none drop-shadow-[0_0_8px_#ef4444]">
+            {h}<span className={colonVisible ? 'opacity-100' : 'opacity-20'}>:</span>{m}<span className={colonVisible ? 'opacity-100' : 'opacity-20'}>:</span>{s}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex-1" />
 
