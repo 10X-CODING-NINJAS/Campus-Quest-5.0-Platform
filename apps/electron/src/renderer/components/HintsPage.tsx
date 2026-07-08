@@ -38,6 +38,20 @@ export default function HintsPage() {
         });
       }
 
+      // Remove any existing building layers from the basemap so they are not transparently visible
+      const styleLayers = map.getStyle().layers;
+      if (styleLayers) {
+        styleLayers.forEach(layer => {
+          if (layer.id.includes('building')) {
+            try {
+              map.removeLayer(layer.id);
+            } catch (e) {
+              // Ignored
+            }
+          }
+        });
+      }
+
       // Find the first label layer ID to insert 3D buildings beneath it
       const layers = map.getStyle().layers;
       let labelLayerId = '';
@@ -50,7 +64,7 @@ export default function HintsPage() {
         }
       }
 
-      // Add 3D building extrusions layer
+      // Add 3D building extrusions layer (opaque, solid colors)
       map.addLayer(
         {
           id: '3d-buildings',
@@ -87,41 +101,60 @@ export default function HintsPage() {
               15.05,
               ['get', 'render_min_height']
             ],
-            'fill-extrusion-opacity': 0.85
+            'fill-extrusion-opacity': 1.0 // Fully opaque solid buildings
           }
         },
         labelLayerId
       );
 
-      // Identify road layers
-      const styleLayers = map.getStyle().layers;
-      const roadLayers = styleLayers?.filter(layer => 
-        layer.type === 'line' && 
-        ((layer as any)['source-layer'] === 'transportation' || layer.id.includes('road') || layer.id.includes('highway'))
-      ) || [];
+      // Add glowing roads casing layer using vector tiles (follows actual curved street geometries)
+      map.addLayer({
+        id: 'glowing-roads-casing',
+        source: 'openfreemap',
+        'source-layer': 'transportation',
+        type: 'line',
+        filter: [
+          'in',
+          ['get', 'name'],
+          ['literal', ['Broadway', 'Canal Street', 'Chambers Street', 'Wall Street', 'Grand Street', 'Lafayette Street', 'Centre Street']]
+        ],
+        paint: {
+          'line-color': '#ff003b',
+          'line-width': 10,
+          'line-blur': 6,
+          'line-opacity': 0.8
+        }
+      });
 
-      // Color all roads red
-      roadLayers.forEach(layer => {
-        try {
-          map.setPaintProperty(layer.id, 'line-color', '#ff003b');
-        } catch (e) {
-          // Ignored
+      // Add glowing roads overlay layer
+      map.addLayer({
+        id: 'glowing-roads-overlay',
+        source: 'openfreemap',
+        'source-layer': 'transportation',
+        type: 'line',
+        filter: [
+          'in',
+          ['get', 'name'],
+          ['literal', ['Broadway', 'Canal Street', 'Chambers Street', 'Wall Street', 'Grand Street', 'Lafayette Street', 'Centre Street']]
+        ],
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 3,
+          'line-opacity': 0.95
         }
       });
 
       // Animate road opacity to create pulsating red glow
       const animateRoads = () => {
         const time = Date.now() / 1000;
-        // Pulsate opacity between 0.3 and 0.95
-        const opacity = 0.3 + Math.abs(Math.sin(time * 2.5)) * 0.65;
+        const opacity = 0.35 + Math.abs(Math.sin(time * 2.5)) * 0.6;
 
-        roadLayers.forEach(layer => {
-          try {
-            map.setPaintProperty(layer.id, 'line-opacity', opacity);
-          } catch (e) {
-            // Ignored
-          }
-        });
+        try {
+          map.setPaintProperty('glowing-roads-casing', 'line-opacity', opacity * 0.8);
+          map.setPaintProperty('glowing-roads-overlay', 'line-opacity', opacity * 0.95);
+        } catch (e) {
+          // Ignored
+        }
 
         animId = requestAnimationFrame(animateRoads);
       };

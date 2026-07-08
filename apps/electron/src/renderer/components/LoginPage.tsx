@@ -20,7 +20,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   };
 
   return (
-    <div className="h-screen w-screen bg-[#05050d] flex items-center justify-center overflow-hidden select-none">
+    <div className="h-screen w-screen bg-black flex items-center justify-center overflow-hidden select-none">
       {/* Halftone texture overlay for comic printed feel */}
       <div className="absolute inset-0 comic-halftone opacity-30 pointer-events-none z-0" />
 
