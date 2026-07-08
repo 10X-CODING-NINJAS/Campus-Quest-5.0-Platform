@@ -3,10 +3,14 @@ import TopBar from './components/TopBar';
 import ProblemPanel from './components/ProblemPanel';
 import RightPanel from './components/RightPanel';
 import LoginPage from './components/LoginPage';
+import Diagnostics from './components/Diagnostics';
+import Lobby from './components/Lobby';
+import HintsPage from './components/HintsPage';
 import fullBg from '../Assets/Full bg.png';
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints'>('login');
+  const [teamName, setTeamName] = useState('Team Earth-1610');
   const [questionNum, setQuestionNum] = useState(7);
   const [selectedLang, setSelectedLang] = useState('cpp');
   const [isSaved, setIsSaved] = useState(true);
@@ -169,12 +173,17 @@ export default function App() {
       <TopBar isPaused={isTeamPaused || contestStatus !== 'RUNNING'} />
 
       {/* Main Workspace Layout */}
-      <div className="flex-1 flex overflow-auto p-6 gap-6 items-start justify-center">
-        {/* Mission Brief panel (Left Column) */}
-        <ProblemPanel 
-          questionNum={questionNum}
-          setQuestionNum={setQuestionNum}
-        />
+      {currentScreen === 'hints' ? (
+        <div className="flex-1 w-full relative min-h-0">
+          <HintsPage />
+        </div>
+      ) : (
+        <div className="flex-1 flex overflow-auto p-6 gap-6 items-start justify-center">
+          {/* Mission Brief panel (Left Column) */}
+          <ProblemPanel 
+            questionNum={questionNum}
+            setQuestionNum={setQuestionNum}
+          />
 
         {/* Code Editor, Test cases and Team Stats panel (Right Column) */}
         <RightPanel 

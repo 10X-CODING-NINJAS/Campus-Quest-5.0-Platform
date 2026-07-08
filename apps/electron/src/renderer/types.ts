@@ -12,3 +12,19 @@ export interface SubmissionResult {
   memoryMb?: number;
   message?: string | undefined;
 }
+
+export interface SpiderVariant {
+  id: number;
+  name: string;
+  theme: {
+    progressColor: string;
+  };
+}
+
+export interface DiagnosticItem {
+  id: string;
+  label: string;
+  iconName: string;
+  status: 'idle' | 'checking' | 'passed' | 'failed';
+  progress: number;
+}
