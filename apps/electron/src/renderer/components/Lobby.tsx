@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import lobbyBg from '../../Assets/Page 3.png';
+import GlitchText from './GlitchText';
 
 interface LobbyProps {
   onProceed: () => void;
@@ -73,9 +74,9 @@ export default function Lobby({ onProceed }: LobbyProps) {
             </span>
           </div>
         ) : (
-          <div className="font-digital text-red-500 text-5xl font-black tracking-widest drop-shadow-[0_0_12px_rgba(239,68,68,0.6)]">
+          <GlitchText className="font-digital text-red-500 text-5xl font-black tracking-widest drop-shadow-[0_0_12px_rgba(239,68,68,0.6)]">
             {formatTime(timeLeft)}
-          </div>
+          </GlitchText>
         )}
       </div>
 
