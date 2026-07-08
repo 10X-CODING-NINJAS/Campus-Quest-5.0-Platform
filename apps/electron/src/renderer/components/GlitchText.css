@@ -23,14 +23,14 @@
 }
 
 .glitch:not(.enable-on-hover)::after {
-  left: 10px;
-  text-shadow: var(--after-shadow, -10px 0 red);
+  left: 2px;
+  text-shadow: var(--after-shadow, -2px 0 red);
   animation: animate-glitch var(--after-duration, 3s) infinite linear alternate-reverse;
 }
 
 .glitch:not(.enable-on-hover)::before {
-  left: -10px;
-  text-shadow: var(--before-shadow, 10px 0 cyan);
+  left: -2px;
+  text-shadow: var(--before-shadow, 2px 0 cyan);
   animation: animate-glitch var(--before-duration, 2s) infinite linear alternate-reverse;
 }
 
@@ -44,16 +44,16 @@
 .glitch.enable-on-hover:hover::after {
   content: attr(data-text);
   opacity: 1;
-  left: 10px;
-  text-shadow: var(--after-shadow, -10px 0 red);
+  left: 2px;
+  text-shadow: var(--after-shadow, -2px 0 red);
   animation: animate-glitch var(--after-duration, 3s) infinite linear alternate-reverse;
 }
 
 .glitch.enable-on-hover:hover::before {
   content: attr(data-text);
   opacity: 1;
-  left: -10px;
-  text-shadow: var(--before-shadow, 10px 0 cyan);
+  left: -2px;
+  text-shadow: var(--before-shadow, 2px 0 cyan);
   animation: animate-glitch var(--before-duration, 2s) infinite linear alternate-reverse;
 }
 

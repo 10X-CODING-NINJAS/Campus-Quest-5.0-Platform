@@ -2,7 +2,12 @@ import { useState, useEffect } from 'react';
 import { Bell, Settings, Minus, Square, X } from 'lucide-react';
 import spiderLogo from '../../Assets/SpiderLogo.jpg';
 
-export default function TopBar() {
+interface TopBarProps {
+  solidBg?: boolean;
+  hideSubmit?: boolean;
+}
+
+export default function TopBar({ solidBg = false, hideSubmit = false }: TopBarProps) {
   const [seconds, setSeconds] = useState(77 * 60 + 42);
   const [colonVisible, setColonVisible] = useState(true);
 
@@ -41,7 +46,7 @@ export default function TopBar() {
   };
 
   return (
-    <header className="flex items-center h-16 px-4 border-b-4 border-black bg-[#0d0d1e]/30 backdrop-blur-md flex-shrink-0 relative z-10 select-none comic-halftone">
+    <header className={`flex items-center h-16 px-4 border-b-4 border-black ${solidBg ? 'bg-[#0d0d1e]' : 'bg-[#0d0d1e]/30 backdrop-blur-md'} flex-shrink-0 relative z-10 select-none comic-halftone`}>
       {/* Logo */}
       <div className="flex items-center gap-2.5 flex-shrink-0">
         <div className="relative flex items-center justify-center w-10 h-10 border-2 border-black rounded-full overflow-hidden shadow-[2px_2px_0px_0px_#000]">
@@ -85,20 +90,21 @@ export default function TopBar() {
       </div>
 
       {/* Submit Test Button */}
-      <button 
-        onClick={() => {
-          if (window.confirm("Are you sure you want to submit the test? This action cannot be undone.")) {
-            alert("Test submitted successfully!");
-            // In a real app, you would send the submission to the server and navigate away or close the app
-            if ((window as any).electronAPI) {
-              (window as any).electronAPI.close();
+      {!hideSubmit && (
+        <button 
+          onClick={() => {
+            if (window.confirm("Are you sure you want to submit the test? This action cannot be undone.")) {
+              alert("Test submitted successfully!");
+              if ((window as any).electronAPI) {
+                (window as any).electronAPI.close();
+              }
             }
-          }
-        }}
-        className="mr-6 px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-[0px_0px_0px_0px_#000] transition-all comic-halftone"
-      >
-        SUBMIT TEST
-      </button>
+          }}
+          className="mr-6 px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-[0px_0px_0px_0px_#000] transition-all comic-halftone"
+        >
+          SUBMIT TEST
+        </button>
+      )}
 
       {/* Controls */}
       <div className="flex items-center gap-1.5 bg-[#1a1a2e] border-2 border-black rounded-lg p-1.5 shadow-[2px_2px_0px_0px_#000]">

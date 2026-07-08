@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import lobbyBg from '../../Assets/Page 3.png';
 import GlitchText from './GlitchText';
+import TopBar from './TopBar';
 
 interface LobbyProps {
   onProceed: () => void;
@@ -53,9 +54,10 @@ export default function Lobby({ onProceed }: LobbyProps) {
 
   return (
     <div 
-      className="h-screen w-screen bg-[#05050d] flex flex-col items-center justify-between overflow-hidden select-none relative"
+      className="h-screen w-screen bg-[#05050d] flex flex-col overflow-hidden select-none relative"
       style={{ backgroundImage: `url(${lobbyBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
     >
+      <TopBar solidBg={true} hideSubmit={true} />
       {/* Halftone texture overlay for comic printed feel */}
       <div className="absolute inset-0 comic-halftone opacity-20 pointer-events-none z-0" />
 
