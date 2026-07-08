@@ -11,9 +11,15 @@ function WebIcon({ className = '' }: { className?: string }) {
 
 interface LeftSidebarProps {
   onSpiderSenseClick?: () => void;
+  powerupCounts?: { SPIDER_SENSE: number; WEB_FLUID: number; SUIT_TECH: number };
+  onUsePowerup?: (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => void;
 }
 
-export default function LeftSidebar({ onSpiderSenseClick }: LeftSidebarProps) {
+export default function LeftSidebar({ onSpiderSenseClick, powerupCounts, onUsePowerup }: LeftSidebarProps) {
+  const spideySenseRemaining = 3 - (powerupCounts?.SPIDER_SENSE || 0);
+  const webFluidRemaining = 2 - (powerupCounts?.WEB_FLUID || 0);
+  const suitTechRemaining = 2 - (powerupCounts?.SUIT_TECH || 0);
+
   return (
     <aside className="w-full bg-[#fdf6e2] comic-panel flex flex-col select-none p-5 text-black h-fit">
       {/* Team Stats Header */}
@@ -51,32 +57,47 @@ export default function LeftSidebar({ onSpiderSenseClick }: LeftSidebarProps) {
           <div className="grid grid-cols-3 gap-3">
             {/* Spider Sense */}
             <div 
-              onClick={onSpiderSenseClick}
-              className="flex flex-col items-center justify-center bg-white/70 border-3 border-black p-2 rounded-none shadow-[3px_3px_0px_#000] hover:translate-y-[-1px] transition-transform cursor-pointer text-center"
+              onClick={() => {
+                if (spideySenseRemaining > 0) {
+                  onUsePowerup?.('SPIDER_SENSE');
+                  if (onSpiderSenseClick) onSpiderSenseClick();
+                }
+              }}
+              className={`flex flex-col items-center justify-center bg-white/70 border-3 border-black p-2 rounded-none shadow-[3px_3px_0px_#000] transition-transform text-center ${spideySenseRemaining > 0 ? 'hover:translate-y-[-1px] cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
             >
               <div className="w-9 h-9 rounded-none bg-[#ef4444] border-2 border-black flex items-center justify-center shadow-[1px_1px_0px_#000] text-white mb-1.5">
                 <WebIcon className="w-4.5 h-4.5" />
               </div>
               <div className="text-black font-display font-bold text-[11px] leading-none">SPIDER SENSE</div>
-              <div className="text-[9px] text-gray-500 font-semibold mt-1">3 usage</div>
+              <div className="text-[9px] text-gray-500 font-semibold mt-1">Remaining: {spideySenseRemaining}</div>
             </div>
 
             {/* Web Fluid */}
-            <div className="flex flex-col items-center justify-center bg-white/70 border-3 border-black p-2 rounded-none shadow-[3px_3px_0px_#000] hover:translate-y-[-1px] transition-transform cursor-pointer text-center">
+            <div 
+              onClick={() => {
+                if (webFluidRemaining > 0) onUsePowerup?.('WEB_FLUID');
+              }}
+              className={`flex flex-col items-center justify-center bg-white/70 border-3 border-black p-2 rounded-none shadow-[3px_3px_0px_#000] transition-transform text-center ${webFluidRemaining > 0 ? 'hover:translate-y-[-1px] cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
+            >
               <div className="w-9 h-9 rounded-none bg-[#3b82f6] border-2 border-black flex items-center justify-center shadow-[1px_1px_0px_#000] text-white mb-1.5">
                 <Zap className="w-4 h-4 fill-current" />
               </div>
               <div className="text-black font-display font-bold text-[11px] leading-none">WEB-FLUID</div>
-              <div className="text-[9px] text-gray-500 font-semibold mt-1">2 usage</div>
+              <div className="text-[9px] text-gray-500 font-semibold mt-1">Remaining: {webFluidRemaining}</div>
             </div>
 
             {/* Suit Tech */}
-            <div className="flex flex-col items-center justify-center bg-white/70 border-3 border-black p-2 rounded-none shadow-[3px_3px_0px_#000] hover:translate-y-[-1px] transition-transform cursor-pointer text-center">
+            <div 
+              onClick={() => {
+                if (suitTechRemaining > 0) onUsePowerup?.('SUIT_TECH');
+              }}
+              className={`flex flex-col items-center justify-center bg-white/70 border-3 border-black p-2 rounded-none shadow-[3px_3px_0px_#000] transition-transform text-center ${suitTechRemaining > 0 ? 'hover:translate-y-[-1px] cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
+            >
               <div className="w-9 h-9 rounded-none bg-[#3b82f6] border-2 border-black flex items-center justify-center shadow-[1px_1px_0px_#000] text-white mb-1.5">
                 <Shield className="w-4.5 h-4.5 fill-current" />
               </div>
               <div className="text-black font-display font-bold text-[11px] leading-none">SUIT TECH</div>
-              <div className="text-[9px] text-gray-500 font-semibold mt-1">2 usage</div>
+              <div className="text-[9px] text-gray-500 font-semibold mt-1">Remaining: {suitTechRemaining}</div>
             </div>
           </div>
         </div>

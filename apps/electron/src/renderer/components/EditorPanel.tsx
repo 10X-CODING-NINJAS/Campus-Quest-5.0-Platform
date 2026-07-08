@@ -4,8 +4,8 @@ import { Challenge, SubmissionResult } from "../types";
 
 interface EditorPanelProps {
   activeChallenge: Challenge;
-  language: "cpp" | "python" | "javascript";
-  setLanguage: (lang: "cpp" | "python" | "javascript") => void;
+  language: "cpp" | "python" | "javascript" | "java";
+  setLanguage: (lang: "cpp" | "python" | "javascript" | "java") => void;
   code: string;
   onChangeCode: (code: string) => void;
   onRunCode: () => void;
@@ -28,6 +28,7 @@ export default function EditorPanel({
 }: EditorPanelProps) {
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const lineNumbersRef = useRef<HTMLDivElement>(null);
   const lineCount = code.split("\n").length;
   const lineNumbers = Array.from({ length: Math.max(1, lineCount) }, (_, i) => i + 1);
 
@@ -54,6 +55,12 @@ export default function EditorPanel({
           textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 4;
         }
       }, 0);
+    }
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    if (lineNumbersRef.current) {
+      lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop;
     }
   };
 
@@ -87,18 +94,29 @@ export default function EditorPanel({
           >
             JS/TS x
           </button>
+          <button
+            onClick={() => setLanguage("java")}
+            className={`px-3 py-1 border-2 border-black rounded-none text-[10px] font-mono font-black transition shadow-[1px_1px_0_rgba(0,0,0,1)] cursor-pointer ${
+              language === "java" ? "bg-emerald-500 text-white" : "bg-white text-black hover:bg-zinc-100"
+            }`}
+          >
+            Java 21 x
+          </button>
         </div>
         
         <div className="flex items-center gap-1 font-mono text-[9px] text-zinc-500 font-bold uppercase">
           <Code className="w-3.5 h-3.5 text-zinc-600 animate-pulse" />
-          {language === "cpp" ? "main.cpp" : language === "python" ? "main.py" : "main.ts"}
+          {language === "cpp" ? "main.cpp" : language === "python" ? "main.py" : language === "java" ? "Main.java" : "main.ts"}
         </div>
       </div>
 
       {/* 2. Main IDE Textarea with line numbers */}
       <div className="flex font-mono text-xs bg-[#1E1E1E] text-[#D4D4D4] rounded-none border-3 border-black overflow-hidden h-[480px] shadow-[3px_3px_0_0_rgba(0,0,0,1)] relative">
         {/* Line Numbers Sidebar */}
-        <div className="bg-[#151515] select-none text-zinc-600 py-3.5 px-2 text-right min-w-[34px] border-r border-zinc-800 text-[11px] font-semibold leading-normal overflow-hidden">
+        <div 
+          ref={lineNumbersRef}
+          className="bg-[#151515] select-none text-zinc-600 py-3 px-2 text-right min-w-[34px] border-r border-zinc-800 text-[11px] font-semibold leading-5 overflow-hidden"
+        >
           {lineNumbers.map((n) => (
             <div key={n} className="h-5">
               {n}
@@ -112,6 +130,7 @@ export default function EditorPanel({
           value={code}
           onChange={(e) => onChangeCode(e.target.value)}
           onKeyDown={handleKeyDown}
+          onScroll={handleScroll}
           spellCheck="false"
           className="flex-1 bg-transparent p-3 text-[#E0E0E0] outline-none resize-none font-mono text-[11px] leading-5 whitespace-pre overflow-auto scrollbar-thin scrollbar-thumb-zinc-700"
           style={{ tabSize: 4 }}
