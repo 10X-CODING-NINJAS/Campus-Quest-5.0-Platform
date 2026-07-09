@@ -1,36 +1,49 @@
-export const LANGUAGE_CONFIG = {
+export interface LanguageConfig {
+  image: string;
+  filename: string;
+  compileCmd: string[] | null;
+  runCmd: string[];
+  timeoutMs: number;
+  memoryMb: number;
+}
+
+export const LANGUAGE_CONFIG: Record<SupportedLanguage, LanguageConfig> = {
   c: {
-    image: 'judge-c:latest',
+    image: process.env.DOCKER_IMAGE_C ?? 'campus-quest-judge-c:latest',
     filename: 'main.c',
-    compileCmd: ['gcc', '-O2', '-o', 'out', 'main.c'],
-    runCmd: ['./out'],
+    compileCmd: ['gcc', 'main.c', '-O2', '-std=c17', '-lm', '-o', 'main'],
+    runCmd: ['./main'],
     timeoutMs: 2000,
     memoryMb: 256,
   },
   cpp: {
-    image: 'judge-cpp:latest',
+    image: process.env.DOCKER_IMAGE_CPP ?? 'campus-quest-judge-cpp:latest',
     filename: 'main.cpp',
-    compileCmd: ['g++', '-O2', '-std=c++17', '-o', 'out', 'main.cpp'],
-    runCmd: ['./out'],
+    compileCmd: ['g++', 'main.cpp', '-O2', '-std=c++17', '-lm', '-o', 'main'],
+    runCmd: ['./main'],
     timeoutMs: 2000,
     memoryMb: 256,
   },
+  java: {
+    image: process.env.DOCKER_IMAGE_JAVA ?? 'campus-quest-judge-java:latest',
+    filename: 'Main.java',
+    compileCmd: ['javac', 'Main.java'],
+    runCmd: ['java', '-Xmx256m', '-Xss64m', '-XX:+UseSerialGC', 'Main'],
+    timeoutMs: 5000,
+    memoryMb: 512,
+  },
   python: {
-    image: 'judge-python:latest',
+    image: process.env.DOCKER_IMAGE_PYTHON ?? 'campus-quest-judge-python:latest',
     filename: 'main.py',
     compileCmd: null,
-    runCmd: ['python3', 'main.py'],
+    runCmd: ['python3', '-u', 'main.py'],
     timeoutMs: 5000,
     memoryMb: 256,
   },
-  java: {
-    image: 'judge-java:latest',
-    filename: 'Main.java',
-    compileCmd: ['javac', 'Main.java'],
-    runCmd: ['java', '-Xmx256m', 'Main'],
-    timeoutMs: 4000,
-    memoryMb: 512,
-  },
-} as const;
+};
 
-export type SupportedLanguage = keyof typeof LANGUAGE_CONFIG;
+export type SupportedLanguage = 'c' | 'cpp' | 'java' | 'python';
+
+export function isSupportedLanguage(lang: string): lang is SupportedLanguage {
+  return lang === 'c' || lang === 'cpp' || lang === 'java' || lang === 'python';
+}

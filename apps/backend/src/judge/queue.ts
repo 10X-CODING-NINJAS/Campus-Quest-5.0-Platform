@@ -1,5 +1,5 @@
 import { Queue, QueueEvents } from 'bullmq';
-import { connection } from '../config/redis';
+import { connection } from '../config/redis.js';
 
 export const JUDGE_QUEUE_NAME = 'judge-queue';
 

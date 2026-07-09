@@ -1,5 +1,5 @@
-import { db } from '../db';
-import { teamPowerups } from '../db/schema';
+import { db } from '../db/index.js';
+import { teamPowerups } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
 const POWERUP_LIMITS = {
@@ -8,7 +8,7 @@ const POWERUP_LIMITS = {
   SUIT_TECH: 2
 };
 
-export function registerPowerupHandlers(socket: any, io: any) {
+export function registerPowerupHandlers(socket: any) {
   
   // Handle a team using a powerup
   socket.on('powerup:use', async ({ type }: { type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH' }) => {
@@ -47,8 +47,8 @@ export function registerPowerupHandlers(socket: any, io: any) {
       // Broadcast back to the team
       socket.emit('powerup:updated', counts);
       
-      // Optionally notify admin
-      io.to('admin-room').emit('admin:powerup_used', { teamId, type, counts });
+      // Optionally notify admin (TODO: if admin socket room is needed)
+      // io.to('admin-room').emit('admin:powerup_used', { teamId, type, counts });
     } else {
       socket.emit('powerup:error', { message: 'Maximum limit reached for this powerup' });
     }

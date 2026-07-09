@@ -1,8 +1,8 @@
-import { db } from '../db';
-import { teams, contests, teamPowerups } from '../db/schema';
+import { db } from '../db/index.js';
+import { teams, contests, teamPowerups } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 
-export function registerContestHandlers(socket: any, io: any) {
+export function registerContestHandlers(socket: any) {
   
   // When a user connects, they can request their initial state
   socket.on('contest:sync', async () => {
@@ -50,7 +50,6 @@ export function registerContestHandlers(socket: any, io: any) {
     // Notify this specific client to show the lockout screen
     socket.emit('team:paused');
     
-    // Optional: broadcast to admin dashboard
-    io.to('admin-room').emit('admin:violation_alert', { teamId, type });
+    // Admin notification is handled by the main io in index.ts if needed
   });
 }
