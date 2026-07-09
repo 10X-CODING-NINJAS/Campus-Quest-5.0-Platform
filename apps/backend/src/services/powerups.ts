@@ -1,5 +1,5 @@
-import { db } from '../db';
-import { teamPowerups, contests } from '../db/schema';
+import { db } from '../db/index.js';
+import { teamPowerups, contests } from '../db/schema.js';
 import { eq, and, isNull } from 'drizzle-orm';
 
 export async function usePowerup(teamId: string, powerupId: string, contestId: string) {

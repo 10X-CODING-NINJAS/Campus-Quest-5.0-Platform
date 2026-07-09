@@ -20,11 +20,7 @@ export default async function leaderboardRoutes(fastify: FastifyInstance) {
       // Penalty = for each solved problem: submission_time_minutes + 20 * wrong_attempts_before_AC
       // Tiebreak: lower penalty wins, then lower total AC runtime.
 
-      const contestStart = await db.select({ startedAt: submissions.createdAt })
-        .from(submissions)
-        .limit(1);
-
-      // Get all accepted submissions (first AC per team+problem)
+    // Get all accepted submissions (first AC per team+problem)
       const firstAcPerProblem = await db
         .selectDistinctOn([submissions.teamId, submissions.problemId], {
           teamId: submissions.teamId,
@@ -73,9 +69,9 @@ export default async function leaderboardRoutes(fastify: FastifyInstance) {
       const teamNameMap = new Map(allTeams.map(t => [t.id, t.name]));
 
       // Build ranked list
-      const entries: LeaderboardEntry[] = Object.values(rows).map((row, _i) => ({
+      const entries: LeaderboardEntry[] = Object.values(rows).map((row) => ({
         teamId: row.teamId,
-        teamName: teamNameMap.get(row.teamId) ?? 'Unknown Team',
+        teamName: (teamNameMap.get(row.teamId) ?? 'Unknown Team') as string,
         solved: row.solved,
         penalty: row.penalty,
         bestRuntime: row.bestRuntime,

@@ -5,7 +5,7 @@ import { submissions, teams } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { createId } from '@paralleldrive/cuid2';
 
-export function registerJudgeHandlers(socket: any, io: any) {
+export function registerJudgeHandlers(socket: any, _io: any) {
   const teamId: string | undefined = socket.data?.teamId;
 
   // ── run:code — execute against sample testcases only, NOT stored ────────────

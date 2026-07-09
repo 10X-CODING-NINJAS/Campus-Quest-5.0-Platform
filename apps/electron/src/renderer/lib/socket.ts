@@ -6,15 +6,17 @@ let _socket: Socket | null = null;
 
 export function getSocket(): Socket {
   if (!_socket) {
-    const token = localStorage.getItem('auth_token') ?? undefined;
-    _socket = io(BACKEND_URL, {
-      transports: ['websocket', 'polling'],
+    const token = localStorage.getItem('auth_token');
+    const socketOptions = {
+      transports: ['websocket', 'polling'] as const,
       autoConnect: true,
-      auth: token ? { token } : undefined,
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-    });
+      ...(token ? { auth: { token } } : {}),
+    };
+
+    _socket = io(BACKEND_URL, socketOptions);
 
     _socket.on('connect', () => {
       console.log('[Socket] Connected:', _socket?.id);

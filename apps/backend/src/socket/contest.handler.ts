@@ -40,7 +40,7 @@ export function registerContestHandlers(socket: any) {
   });
 
   // Automatically triggered when frontend detects security violation
-  socket.on('violation:trigger', async ({ type }: { type: string }) => {
+  socket.on('violation:trigger', async ({ type: _type }: { type: string }) => {
     const teamId = socket.data?.teamId;
     if (!teamId) return;
 

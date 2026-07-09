@@ -118,7 +118,7 @@ export function startJudgeWorker(io?: { to: (room: string) => { emit: (ev: strin
 
       throw new Error('Unknown job type');
     },
-    { connection, concurrency },
+    { connection: connection as any, concurrency },
   );
 
   worker.on('ready', () => {

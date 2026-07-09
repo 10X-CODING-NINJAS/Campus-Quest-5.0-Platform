@@ -100,8 +100,8 @@ async function bootstrap() {
   // ── Start listening ────────────────────────────────────────────────────────
   await fastify.ready();
   await new Promise<void>((resolve, reject) => {
-    httpServer.listen({ port: PORT, host: HOST }, (err) => {
-      if (err) return reject(err);
+    httpServer.on('error', reject);
+    httpServer.listen(PORT, HOST, () => {
       console.log(`\n🚀 Campus Quest Backend running at http://${HOST}:${PORT}`);
       console.log(`📡 Socket.IO attached`);
       console.log(`⚖️  Judge Worker started`);
