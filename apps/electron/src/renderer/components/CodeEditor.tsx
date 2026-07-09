@@ -24,7 +24,7 @@ interface CodeEditorProps {
   isRunning: boolean;
 }
 
-export function CodeEditor({ problemId, onRun, onSubmit, isRunning }: CodeEditorProps) {
+export function CodeEditor({ problemId: _, onRun, onSubmit, isRunning }: CodeEditorProps) {
   const [language, setLanguage] = useState<Language>('cpp');
   const [code, setCode] = useState(BOILERPLATE['cpp']);
   const [stdin, setStdin] = useState('');

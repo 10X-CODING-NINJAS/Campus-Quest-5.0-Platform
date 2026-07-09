@@ -30,7 +30,7 @@ export function useJudge(problemId: string) {
       setIsRunning(false);
     };
 
-    const onSubmitResult = (result: any) => {
+    const onSubmitResult = (_result: any) => {
       setIsRunning(false);
       // navigate to verdict view, update leaderboard state, etc.
     };
