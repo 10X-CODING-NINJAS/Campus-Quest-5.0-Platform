@@ -185,7 +185,13 @@ export default function App() {
       )}
 
       {/* Custom Header with controls & timer */}
-      <TopBar isPaused={isTeamPaused || contestStatus !== 'RUNNING'} teamName={teamName} onTeamNameChange={setTeamName} />
+      <TopBar 
+        isPaused={isTeamPaused || contestStatus !== 'RUNNING'} 
+        teamName={teamName} 
+        onTeamNameChange={setTeamName} 
+        currentScreen={currentScreen}
+        onNavigate={(screen) => setCurrentScreen(screen)}
+      />
 
       {/* Main Workspace Layout */}
       {currentScreen === 'hints' ? (
@@ -209,6 +215,7 @@ export default function App() {
             setIsSaved={setIsSaved}
             powerupCounts={powerupCounts}
             onUsePowerup={handleUsePowerup}
+            onUseSpideySenseSuccess={() => setCurrentScreen('hints')}
           />
         </div>
       )}

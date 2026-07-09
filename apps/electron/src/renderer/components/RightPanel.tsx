@@ -74,6 +74,7 @@ interface RightPanelProps {
   setIsSaved: React.Dispatch<React.SetStateAction<boolean>>;
   powerupCounts: { SPIDER_SENSE: number; WEB_FLUID: number; SUIT_TECH: number };
   onUsePowerup: (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => void;
+  onUseSpideySenseSuccess?: () => void;
 }
 
 export default function RightPanel({
@@ -81,7 +82,8 @@ export default function RightPanel({
   setSelectedLang,
   setIsSaved,
   powerupCounts,
-  onUsePowerup
+  onUsePowerup,
+  onUseSpideySenseSuccess
 }: RightPanelProps) {
   const [codes, setCodes] = useState<Record<string, string>>({
     cpp: CXX_TEMPLATE,
@@ -188,6 +190,7 @@ export default function RightPanel({
       <SpideySenseModal
         isOpen={isSpideyModalOpen}
         onClose={() => setIsSpideyModalOpen(false)}
+        onUse={onUseSpideySenseSuccess}
       />
     </div>
   );

@@ -9,6 +9,8 @@ interface TopBarProps {
   hideSubmit?: boolean;
   teamName?: string;
   onTeamNameChange?: (name: string) => void;
+  currentScreen?: 'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints';
+  onNavigate?: (screen: 'coding' | 'hints') => void;
 }
 
 export default function TopBar({
@@ -17,7 +19,9 @@ export default function TopBar({
   solidBg = false,
   hideSubmit = false,
   teamName = 'Team Earth-1610',
-  onTeamNameChange
+  onTeamNameChange,
+  currentScreen = 'coding',
+  onNavigate
 }: TopBarProps) {
   const [seconds, setSeconds] = useState(77 * 60 + 42);
   const [colonVisible, setColonVisible] = useState(true);
@@ -76,6 +80,32 @@ export default function TopBar({
           </div>
         </div>
       </div>
+
+      {/* Navigation Tabs (Only when not in lobby) */}
+      {!isLobby && onNavigate && (
+        <div className="flex items-center gap-2 border-2 border-black bg-black/40 rounded-lg p-1 ml-6 shadow-[2px_2px_0px_#000]">
+          <button
+            onClick={() => onNavigate('coding')}
+            className={`px-3 py-1.5 text-xs font-bold font-mono border-2 border-black rounded transition-all shadow-[2px_2px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-none ${
+              currentScreen === 'coding'
+                ? 'bg-yellow-400 text-black'
+                : 'bg-zinc-800 text-zinc-300 hover:text-white'
+            }`}
+          >
+            CODING
+          </button>
+          <button
+            onClick={() => onNavigate('hints')}
+            className={`px-3 py-1.5 text-xs font-bold font-mono border-2 border-black rounded transition-all shadow-[2px_2px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-none ${
+              currentScreen === 'hints'
+                ? 'bg-yellow-400 text-black'
+                : 'bg-zinc-800 text-zinc-300 hover:text-white'
+            }`}
+          >
+            HINTS MAP
+          </button>
+        </div>
+      )}
 
       <div className="flex-1" />
 

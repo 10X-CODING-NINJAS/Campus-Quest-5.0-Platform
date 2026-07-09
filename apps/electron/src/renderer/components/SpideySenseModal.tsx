@@ -5,9 +5,10 @@ import spideySenseUsage from '../../Assets/Spidey sense usage.png';
 interface SpideySenseModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onUse?: (() => void) | undefined;
 }
 
-export default function SpideySenseModal({ isOpen, onClose }: SpideySenseModalProps) {
+export default function SpideySenseModal({ isOpen, onClose, onUse }: SpideySenseModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -82,6 +83,7 @@ export default function SpideySenseModal({ isOpen, onClose }: SpideySenseModalPr
             <button
               onClick={() => {
                 alert("SPIDEY SENSE DEPLOYED!");
+                onUse?.();
                 onClose();
               }}
               type="button"
