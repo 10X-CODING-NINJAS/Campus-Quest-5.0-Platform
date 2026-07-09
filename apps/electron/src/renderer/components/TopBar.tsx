@@ -1,11 +1,31 @@
 import { useState, useEffect } from 'react';
-import { Bell, Settings, Minus, Square, X, Play, Pause } from 'lucide-react';
+import { Bell, Settings, Minus, Square, X } from 'lucide-react';
 import spiderLogo from '../../Assets/SpiderLogo.jpg';
 
-export default function TopBar({ isPaused = false }: { isPaused?: boolean }) {
+interface TopBarProps {
+  isPaused?: boolean;
+  isLobby?: boolean;
+  solidBg?: boolean;
+  hideSubmit?: boolean;
+  teamName?: string;
+  onTeamNameChange?: (name: string) => void;
+  currentScreen?: 'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints';
+  onNavigate?: (screen: 'coding' | 'hints') => void;
+}
+
+export default function TopBar({
+  isPaused = false,
+  isLobby = false,
+  solidBg = false,
+  hideSubmit = false,
+  teamName = 'Team Earth-1610',
+  onTeamNameChange,
+  currentScreen = 'coding',
+  onNavigate
+}: TopBarProps) {
   const [seconds, setSeconds] = useState(77 * 60 + 42);
   const [colonVisible, setColonVisible] = useState(true);
-  const [isRunning, setIsRunning] = useState(true);
+  const isRunning = true;
 
   useEffect(() => {
     let interval: any;
@@ -61,6 +81,32 @@ export default function TopBar({ isPaused = false }: { isPaused?: boolean }) {
         </div>
       </div>
 
+      {/* Navigation Tabs (Only when not in lobby) */}
+      {!isLobby && onNavigate && (
+        <div className="flex items-center gap-2 border-2 border-black bg-black/40 rounded-lg p-1 ml-6 shadow-[2px_2px_0px_#000]">
+          <button
+            onClick={() => onNavigate('coding')}
+            className={`px-3 py-1.5 text-xs font-bold font-mono border-2 border-black rounded transition-all shadow-[2px_2px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-none ${
+              currentScreen === 'coding'
+                ? 'bg-yellow-400 text-black'
+                : 'bg-zinc-800 text-zinc-300 hover:text-white'
+            }`}
+          >
+            CODING
+          </button>
+          <button
+            onClick={() => onNavigate('hints')}
+            className={`px-3 py-1.5 text-xs font-bold font-mono border-2 border-black rounded transition-all shadow-[2px_2px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-none ${
+              currentScreen === 'hints'
+                ? 'bg-yellow-400 text-black'
+                : 'bg-zinc-800 text-zinc-300 hover:text-white'
+            }`}
+          >
+            HINTS MAP
+          </button>
+        </div>
+      )}
+
       <div className="flex-1" />
 
       {/* Center Mission Time Digital Panel */}
@@ -85,7 +131,16 @@ export default function TopBar({ isPaused = false }: { isPaused?: boolean }) {
           />
         </div>
         <div className="text-left hidden lg:block">
-          <div className="text-white text-xs font-bold font-sans tracking-wide whitespace-nowrap">Team Earth-1610</div>
+          {isLobby ? (
+            <input
+              type="text"
+              value={teamName}
+              onChange={(e) => onTeamNameChange?.(e.target.value)}
+              className="bg-transparent border-b border-dashed border-red-500 text-white text-xs font-bold font-sans tracking-wide focus:outline-none focus:border-solid w-32"
+            />
+          ) : (
+            <div className="text-white text-xs font-bold font-sans tracking-wide whitespace-nowrap">{teamName}</div>
+          )}
           <div className="text-gray-400 text-[10px] font-mono italic whitespace-nowrap">- We do this together.</div>
         </div>
       </div>
@@ -98,19 +153,21 @@ export default function TopBar({ isPaused = false }: { isPaused?: boolean }) {
       </div>
 
       {/* Submit Test Button */}
-      <button 
-        onClick={() => {
-          if (window.confirm("Are you sure you want to submit the test? This action cannot be undone.")) {
-            alert("Test submitted successfully!");
-            if ((window as any).electronAPI) {
-              (window as any).electronAPI.close();
+      {!hideSubmit && (
+        <button 
+          onClick={() => {
+            if (window.confirm("Are you sure you want to submit the test? This action cannot be undone.")) {
+              alert("Test submitted successfully!");
+              if ((window as any).electronAPI) {
+                (window as any).electronAPI.close();
+              }
             }
-          }
-        }}
-        className="mr-3 px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-[0px_0px_0px_0px_#000] transition-all comic-halftone whitespace-nowrap text-sm"
-      >
-        SUBMIT TEST
-      </button>
+          }}
+          className="mr-3 px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-[0px_0px_0px_0px_#000] transition-all comic-halftone whitespace-nowrap text-sm"
+        >
+          SUBMIT TEST
+        </button>
+      )}
 
       {/* Controls */}
       <div className="flex items-center gap-1.5 bg-[#1a1a2e] border-2 border-black rounded-lg p-1.5 shadow-[2px_2px_0px_0px_#000]">

@@ -7,6 +7,7 @@ import Diagnostics from './components/Diagnostics';
 import Lobby from './components/Lobby';
 import HintsPage from './components/HintsPage';
 import fullBg from '../Assets/Full bg.png';
+import { socket } from './lib/socket';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints'>('login');
@@ -31,10 +32,10 @@ export default function App() {
     };
 
     // If using socket.io:
-    // socket.on('contest:started', handleContestStarted);
-    // socket.on('team:paused', handleTeamPaused);
-    // socket.on('team:resumed', handleTeamResumed);
-    // socket.on('powerup:updated', (counts) => setPowerupCounts(counts));
+    socket.on('contest:started', handleContestStarted);
+    socket.on('team:paused', handleTeamPaused);
+    socket.on('team:resumed', handleTeamResumed);
+    socket.on('powerup:updated', (counts: any) => setPowerupCounts(counts));
 
     // Initial sync mock
     // socket.emit('contest:sync');
@@ -57,7 +58,7 @@ export default function App() {
             setSecurityWarning(null); 
           } else {
             // Emit violation to backend to pause the team
-            // socket.emit('violation:trigger', { type });
+            socket.emit('violation:trigger', { type });
             
             // For now, we simulate the socket response to test UI
             setIsTeamPaused(true);
@@ -74,17 +75,17 @@ export default function App() {
     }
 
     return () => {
-      // socket.off('contest:started', handleContestStarted);
-      // socket.off('team:paused', handleTeamPaused);
-      // socket.off('team:resumed', handleTeamResumed);
-      // socket.off('powerup:updated');
+      socket.off('contest:started', handleContestStarted);
+      socket.off('team:paused', handleTeamPaused);
+      socket.off('team:resumed', handleTeamResumed);
+      socket.off('powerup:updated', () => {});
     };
   }, []);
 
   // Handler for using a powerup directly via socket
   const handleUsePowerup = (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => {
     // If using real socket:
-    // socket.emit('powerup:use', { type });
+    socket.emit('powerup:use', { type });
     
     // Mock for UI:
     setPowerupCounts(prev => ({
@@ -93,8 +94,22 @@ export default function App() {
     }));
   };
 
-  if (!isLoggedIn) {
-    return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
+  if (currentScreen === 'login') {
+    return <LoginPage onLogin={() => setCurrentScreen('diagnostics')} />;
+  }
+
+  if (currentScreen === 'diagnostics') {
+    return <Diagnostics onProceed={() => setCurrentScreen('lobby')} />;
+  }
+
+  if (currentScreen === 'lobby') {
+    return (
+      <Lobby 
+        teamName={teamName} 
+        onTeamNameChange={setTeamName} 
+        onProceed={() => setCurrentScreen('coding')} 
+      />
+    );
   }
 
   return (
@@ -122,7 +137,7 @@ export default function App() {
         <div className="absolute inset-0 z-[70] flex items-center justify-center bg-red-900/90 backdrop-blur-md p-6">
           <div className="bg-black border-4 border-red-600 rounded-xl p-10 max-w-2xl text-center shadow-[12px_12px_0px_0px_rgba(220,38,38,1)] comic-halftone">
             <h2 className="text-5xl font-bold text-red-500 mb-4 tracking-widest font-mono">TEST PAUSED</h2>
-            <p className="text-2xl text-white mb-6">Security Violation Detected.</p>
+            <p className="text-2xl text-white mb-6">{securityWarning || `Security Violation Detected (Violation ${violationCount}/5).`}</p>
             <p className="text-lg text-gray-300 mb-8 max-w-md mx-auto">
               Your test session has been suspended by the anti-cheat system. You must wait for an administrator to review the logs and unlock your terminal.
             </p>
@@ -170,7 +185,13 @@ export default function App() {
       )}
 
       {/* Custom Header with controls & timer */}
-      <TopBar isPaused={isTeamPaused || contestStatus !== 'RUNNING'} />
+      <TopBar 
+        isPaused={isTeamPaused || contestStatus !== 'RUNNING'} 
+        teamName={teamName} 
+        onTeamNameChange={setTeamName} 
+        currentScreen={currentScreen}
+        onNavigate={(screen) => setCurrentScreen(screen)}
+      />
 
       {/* Main Workspace Layout */}
       {currentScreen === 'hints' ? (
@@ -185,17 +206,19 @@ export default function App() {
             setQuestionNum={setQuestionNum}
           />
 
-        {/* Code Editor, Test cases and Team Stats panel (Right Column) */}
-        <RightPanel 
-          questionNum={questionNum}
-          selectedLang={selectedLang}
-          setSelectedLang={setSelectedLang}
-          isSaved={isSaved}
-          setIsSaved={setIsSaved}
-          powerupCounts={powerupCounts}
-          onUsePowerup={handleUsePowerup}
-        />
-      </div>
+          {/* Code Editor, Test cases and Team Stats panel (Right Column) */}
+          <RightPanel 
+            questionNum={questionNum}
+            selectedLang={selectedLang}
+            setSelectedLang={setSelectedLang}
+            isSaved={isSaved}
+            setIsSaved={setIsSaved}
+            powerupCounts={powerupCounts}
+            onUsePowerup={handleUsePowerup}
+            onUseSpideySenseSuccess={() => setCurrentScreen('hints')}
+          />
+        </div>
+      )}
     </div>
   );
 }
