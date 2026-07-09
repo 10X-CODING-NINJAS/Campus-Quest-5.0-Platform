@@ -2,21 +2,44 @@ import React, { useState } from 'react';
 import loginBg from '../../Assets/LoginPage.png';
 
 interface LoginPageProps {
-  onLogin: (teamName: string) => void;
+  onLogin: (token: string, team: { id: string; name: string; isPaused: boolean; spiderSenseCharges: number }) => void;
 }
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3001';
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [teamName, setTeamName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!teamName.trim() || !password.trim()) {
       setError('ALL FIELDS REQUIRED, HERO!');
       return;
     }
-    onLogin(teamName);
+    setError(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: teamName, password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'TRANS-DIMENSIONAL CONNECTION FAILURE!');
+      }
+
+      onLogin(data.token, data.team);
+    } catch (err: any) {
+      setError(err.message || 'FAILED TO ESTABLISH COM-LINK!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

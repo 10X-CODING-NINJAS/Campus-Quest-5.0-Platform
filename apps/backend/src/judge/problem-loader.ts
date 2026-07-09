@@ -16,6 +16,7 @@ export interface ProblemMeta {
   supportedLanguages: string[];
   checkerType: 'default' | 'float' | 'unordered' | 'case-insensitive' | 'custom';
   starterCode?: Record<string, string>;
+  order?: number;
 }
 
 export interface Testcase {

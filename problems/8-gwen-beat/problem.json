@@ -1,0 +1,15 @@
+{
+  "id": "8-gwen-beat",
+  "title": "Arachnid Pulse Alignment",
+  "difficulty": "Easy",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "checkerType": "default",
+  "order": 8
+}

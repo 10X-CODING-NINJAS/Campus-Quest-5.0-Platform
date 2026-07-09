@@ -1,0 +1,15 @@
+{
+  "id": "10-multiverse-run",
+  "title": "The Leap of Faith",
+  "difficulty": "Hard",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "checkerType": "default",
+  "order": 10
+}

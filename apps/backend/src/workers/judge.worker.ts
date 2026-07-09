@@ -53,6 +53,8 @@ export interface RunJobResult {
     stderr: string;
     runtimeMs: number;
     memoryKb: number;
+    input?: string;
+    expectedOutput?: string;
   }>;
 }
 
@@ -142,6 +144,8 @@ async function handleRunJob(data: RunJobData): Promise<RunJobResult> {
     const { workDir, cleanup: cleanFn } = await prepareWorkDir(data.language, data.code);
     cleanup = cleanFn;
 
+    const problem = await loadProblemMeta(data.problemId);
+
     // Compile
     const compileResult = await compile(data.language, data.code, workDir);
     if (!compileResult.success) {
@@ -155,7 +159,7 @@ async function handleRunJob(data: RunJobData): Promise<RunJobResult> {
 
     const config = LANGUAGE_CONFIG[data.language];
     const testcases = data.customStdin !== undefined
-      ? [{ input: data.customStdin, output: '' }]
+      ? [{ input: data.customStdin, output: '', inputPath: '', outputPath: '' }]
       : await loadSampleTestcases(data.problemId);
 
     const testcaseResults: RunJobResult['testcaseResults'] = [];
@@ -165,18 +169,40 @@ async function handleRunJob(data: RunJobData): Promise<RunJobResult> {
       const result = await runTestcase(
         data.language,
         workDir,
-        tc.input,
+        tc.input || { filePath: tc.inputPath },
         config.timeoutMs,
         config.memoryMb,
       );
 
+      let tcVerdict = result.verdict;
+      if (result.verdict === 'AC' && data.customStdin === undefined) {
+        const checkerResult = check(
+          problem.checkerType ?? 'default',
+          tc.output || { filePath: tc.outputPath },
+          result.stdout,
+          {
+            input: tc.input || { filePath: tc.inputPath },
+            problemId: data.problemId,
+          }
+        );
+        if (checkerResult.pass) {
+          tcVerdict = 'AC';
+        } else if (checkerResult.message.startsWith('Presentation Error')) {
+          tcVerdict = 'PE';
+        } else {
+          tcVerdict = 'WA';
+        }
+      }
+
       testcaseResults.push({
         index: i,
-        verdict: result.verdict,
+        verdict: tcVerdict,
         stdout: result.stdout,
         stderr: result.stderr,
         runtimeMs: result.runtimeMs,
         memoryKb: result.memoryKb,
+        input: tc.input,
+        expectedOutput: tc.output,
       });
     }
 

@@ -12,14 +12,19 @@ export default async function problemRoutes(fastify: FastifyInstance) {
     try {
       const problems = await discoverProblems();
 
-      // Return only safe fields
-      const safeProblems = problems.map(p => ({
+      // Filter to only include active themed problems with an 'order' field, sorted
+      const filteredSorted = problems
+        .filter(p => typeof p.order === 'number')
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+      const safeProblems = filteredSorted.map(p => ({
         id: p.id,
         title: p.title,
         difficulty: p.difficulty,
         timeLimit: p.timeLimit,
         memoryLimit: p.memoryLimit,
         supportedLanguages: p.supportedLanguages,
+        order: p.order,
       }));
 
       return reply.send(safeProblems);
@@ -49,6 +54,7 @@ export default async function problemRoutes(fastify: FastifyInstance) {
         supportedLanguages: meta.supportedLanguages,
         starterCode: meta.starterCode ?? {},
         checkerType: meta.checkerType,
+        order: meta.order,
         statement,
         // SECURITY: only expose sample inputs. Never expose expected outputs.
         sampleInputs: samples.map(tc => tc.input),

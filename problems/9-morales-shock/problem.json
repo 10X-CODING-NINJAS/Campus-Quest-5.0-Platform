@@ -1,0 +1,15 @@
+{
+  "id": "9-morales-shock",
+  "title": "Bio-Electric Energy Flow",
+  "difficulty": "Hard",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "checkerType": "default",
+  "order": 9
+}

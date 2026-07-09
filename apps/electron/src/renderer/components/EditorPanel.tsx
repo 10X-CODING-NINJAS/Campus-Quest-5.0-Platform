@@ -5,8 +5,8 @@ import { Challenge, SubmissionResult } from "../types";
 
 interface EditorPanelProps {
   activeChallenge: Challenge;
-  language: "cpp" | "python" | "javascript" | "java";
-  setLanguage: (lang: "cpp" | "python" | "javascript" | "java") => void;
+  language: "cpp" | "python" | "c" | "java";
+  setLanguage: (lang: "cpp" | "python" | "c" | "java") => void;
   code: string;
   onChangeCode: (code: string) => void;
   onRunCode: () => void;
@@ -58,12 +58,12 @@ export default function EditorPanel({
             Python 3 x
           </button>
           <button
-            onClick={() => setLanguage("javascript")}
+            onClick={() => setLanguage("c")}
             className={`px-3 py-1 border-2 border-black rounded-none text-[10px] font-mono font-black transition shadow-[1px_1px_0_rgba(0,0,0,1)] cursor-pointer ${
-              language === "javascript" ? "bg-sky-500 text-white" : "bg-white text-black hover:bg-zinc-100"
+              language === "c" ? "bg-sky-500 text-white" : "bg-white text-black hover:bg-zinc-100"
             }`}
           >
-            JS/TS x
+            C17 x
           </button>
           <button
             onClick={() => setLanguage("java")}
@@ -77,7 +77,7 @@ export default function EditorPanel({
         
         <div className="flex items-center gap-1 font-mono text-[9px] text-zinc-500 font-bold uppercase">
           <Code className="w-3.5 h-3.5 text-zinc-600 animate-pulse" />
-          {language === "cpp" ? "main.cpp" : language === "python" ? "main.py" : language === "java" ? "Main.java" : "main.ts"}
+          {language === "cpp" ? "main.cpp" : language === "python" ? "main.py" : language === "java" ? "Main.java" : "main.c"}
         </div>
       </div>
 
@@ -86,7 +86,7 @@ export default function EditorPanel({
         <Editor
           height="100%"
           width="100%"
-          language={language === "cpp" ? "cpp" : language === "python" ? "python" : language === "java" ? "java" : "javascript"}
+          language={language === "cpp" ? "cpp" : language === "python" ? "python" : language === "java" ? "java" : "c"}
           value={code}
           onChange={(v) => onChangeCode(v ?? "")}
           theme="vs-dark"
