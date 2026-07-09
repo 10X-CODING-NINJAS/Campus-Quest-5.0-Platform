@@ -248,7 +248,7 @@ async function handleSubmitJob(data: SubmitJobData): Promise<SubmitJobResult> {
       const result = await runTestcase(
         data.language,
         workDir,
-        tc.input,
+        tc.input || { filePath: tc.inputPath },
         timeLimit,
         memoryLimit,
       );
@@ -258,12 +258,15 @@ async function handleSubmitJob(data: SubmitJobData): Promise<SubmitJobResult> {
 
       let tcVerdict: Verdict = result.verdict;
 
-      // If execution was clean, check output via checker
       if (result.verdict === 'AC') {
         const checkerResult = check(
           problem.checkerType ?? 'default',
-          tc.output,
+          tc.output || { filePath: tc.outputPath },
           result.stdout,
+          {
+            input: tc.input || { filePath: tc.inputPath },
+            problemId: data.problemId,
+          }
         );
 
         if (checkerResult.pass) {

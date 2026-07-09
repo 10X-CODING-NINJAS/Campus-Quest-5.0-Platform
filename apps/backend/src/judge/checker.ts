@@ -1,3 +1,8 @@
+import { execFileSync } from 'child_process';
+import { writeFileSync, readFileSync, mkdtempSync, rmSync } from 'fs';
+import path from 'path';
+import { tmpdir } from 'os';
+
 export type CheckerType = 'default' | 'float' | 'unordered' | 'case-insensitive' | 'custom';
 
 export interface CheckerResult {
@@ -93,29 +98,87 @@ function checkCaseInsensitive(expected: string, actual: string): CheckerResult {
 
 export function check(
   type: CheckerType,
-  expected: string,
+  expected: string | { filePath: string },
   actual: string,
-  options?: { epsilon?: number },
+  options?: { epsilon?: number; input?: string | { filePath: string }; problemId?: string },
 ): CheckerResult {
   // Guard: output limit check — if actual output is unreasonably large, flag OLE
   if (actual.length > 4 * 1024 * 1024) {
     return { pass: false, message: 'Output Limit Exceeded: output exceeded 4 MB' };
   }
 
+  // Resolve expected to string if it's a file path
+  let expectedStr = '';
+  if (typeof expected === 'string') {
+    expectedStr = expected;
+  } else {
+    try {
+      expectedStr = readFileSync(expected.filePath, 'utf-8');
+    } catch (e: any) {
+      return { pass: false, message: `Internal Error: Failed to read expected output file: ${e.message}` };
+    }
+  }
+
   switch (type) {
     case 'default':
-      return checkDefault(expected, actual);
+      return checkDefault(expectedStr, actual);
     case 'float':
-      return checkFloat(expected, actual, options?.epsilon ?? 1e-6);
+      return checkFloat(expectedStr, actual, options?.epsilon ?? 1e-6);
     case 'unordered':
-      return checkUnordered(expected, actual);
+      return checkUnordered(expectedStr, actual);
     case 'case-insensitive':
-      return checkCaseInsensitive(expected, actual);
-    case 'custom':
-      // Custom checker support: for now, fall back to default.
-      // Full custom checker execution (via tsx) can be added per-problem.
-      return checkDefault(expected, actual);
+      return checkCaseInsensitive(expectedStr, actual);
+    case 'custom': {
+      if (!options?.problemId) {
+        return { pass: false, message: 'Internal Error: problem ID not provided for custom checker' };
+      }
+      const problemId = options.problemId;
+      const PROBLEMS_ROOT = process.env.PROBLEMS_DIR
+        ? path.resolve(process.env.PROBLEMS_DIR)
+        : path.resolve(process.cwd(), 'problems');
+      const checkerPath = path.join(PROBLEMS_ROOT, problemId, 'checker.ts');
+
+      const tempDir = mkdtempSync(path.join(tmpdir(), 'checker-'));
+      try {
+        const inputPath = options.input && typeof options.input === 'object' && 'filePath' in options.input
+          ? options.input.filePath
+          : path.join(tempDir, 'input.txt');
+        const expectedPath = typeof expected === 'object' && 'filePath' in expected
+          ? expected.filePath
+          : path.join(tempDir, 'expected.txt');
+        const actualPath = path.join(tempDir, 'actual.txt');
+
+        if (inputPath === path.join(tempDir, 'input.txt')) {
+          writeFileSync(inputPath, (options.input as string) ?? '', 'utf-8');
+        }
+        if (expectedPath === path.join(tempDir, 'expected.txt')) {
+          writeFileSync(expectedPath, expectedStr, 'utf-8');
+        }
+        writeFileSync(actualPath, actual, 'utf-8');
+
+        // Execute checker.ts using tsx (since it's a ts file)
+        const stdout = execFileSync('npx', [
+          'tsx',
+          checkerPath,
+          inputPath,
+          expectedPath,
+          actualPath,
+        ], {
+          timeout: 5000,
+          encoding: 'utf-8',
+        });
+
+        return { pass: true, message: stdout.trim() || 'Accepted' };
+      } catch (err: any) {
+        const message = err.stdout?.trim() || err.stderr?.trim() || err.message || 'Wrong Answer';
+        return { pass: false, message };
+      } finally {
+        try {
+          rmSync(tempDir, { recursive: true, force: true });
+        } catch {}
+      }
+    }
     default:
-      return checkDefault(expected, actual);
+      return checkDefault(expectedStr, actual);
   }
 }

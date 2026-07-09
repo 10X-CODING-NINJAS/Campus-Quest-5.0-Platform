@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'fs/promises';
+import { readFile, readdir, stat } from 'fs/promises';
 import path from 'path';
 
 // Root directory where all problems live.
@@ -21,6 +21,8 @@ export interface ProblemMeta {
 export interface Testcase {
   input: string;
   output: string;
+  inputPath: string;
+  outputPath: string;
 }
 
 // ── Problem metadata ────────────────────────────────────────────────────────
@@ -29,6 +31,29 @@ export async function loadProblemMeta(id: string): Promise<ProblemMeta> {
   const jsonPath = path.join(PROBLEMS_ROOT, id, 'problem.json');
   const raw = await readFile(jsonPath, 'utf-8');
   const parsed = JSON.parse(raw) as ProblemMeta;
+
+  const starterCode: Record<string, string> = {};
+  const langs = ['c', 'cpp', 'java', 'python'];
+  const extMap: Record<string, string> = {
+    c: 'c.c',
+    cpp: 'cpp.cpp',
+    java: 'java.java',
+    python: 'python.py',
+  };
+
+  const starterDir = path.join(PROBLEMS_ROOT, id, 'starter');
+  for (const lang of langs) {
+    try {
+      const fileContent = await readFile(path.join(starterDir, extMap[lang]), 'utf-8');
+      starterCode[lang] = fileContent;
+    } catch {
+      if (parsed.starterCode?.[lang]) {
+        starterCode[lang] = parsed.starterCode[lang];
+      }
+    }
+  }
+
+  parsed.starterCode = starterCode;
   return parsed;
 }
 
@@ -62,9 +87,27 @@ async function loadTestcasesFromDir(dir: string): Promise<Testcase[]> {
     const outFile = `${baseName}.out`;
     if (!entries.includes(outFile)) continue; // skip if no matching .out
 
-    const input = await readFile(path.join(dir, inFile), 'utf-8');
-    const output = await readFile(path.join(dir, outFile), 'utf-8');
-    testcases.push({ input, output });
+    const inputPath = path.join(dir, inFile);
+    const outputPath = path.join(dir, outFile);
+
+    let input = '';
+    let output = '';
+
+    try {
+      const inputStat = await stat(inputPath);
+      if (inputStat.size < 5 * 1024 * 1024) {
+        input = await readFile(inputPath, 'utf-8');
+      }
+    } catch {}
+
+    try {
+      const outputStat = await stat(outputPath);
+      if (outputStat.size < 5 * 1024 * 1024) {
+        output = await readFile(outputPath, 'utf-8');
+      }
+    } catch {}
+
+    testcases.push({ input, output, inputPath, outputPath });
   }
 
   return testcases;

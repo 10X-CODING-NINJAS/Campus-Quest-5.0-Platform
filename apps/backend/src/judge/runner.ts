@@ -1,5 +1,6 @@
 import Dockerode from 'dockerode';
 import { mkdtemp, writeFile, rm, chmod } from 'fs/promises';
+import { createReadStream } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { LANGUAGE_CONFIG, SupportedLanguage } from './languages.js';
@@ -76,7 +77,7 @@ export async function compile(
 export async function runTestcase(
   language: SupportedLanguage,
   workDir: string,
-  stdin: string,
+  stdin: string | { filePath: string },
   timeoutMs: number,
   memoryMb: number,
 ): Promise<TestcaseResult> {
@@ -146,7 +147,7 @@ interface ContainerRunOptions {
   image: string;
   workDir: string;
   cmd: string[];
-  stdin: string;
+  stdin: string | { filePath: string };
   timeoutMs: number;
   memoryMb: number;
   isCompile: boolean;
@@ -203,93 +204,106 @@ async function runContainer(opts: ContainerRunOptions): Promise<ContainerRunResu
   let memoryKb = 0;
   const startMs = Date.now();
 
-  // Attach streams BEFORE starting
-  const stream = await container.attach({
-    stream: true,
-    stdin: true,
-    stdout: true,
-    stderr: true,
-  });
-
-  // Docker multiplexes stdout/stderr on same stream; demux them
-  const stdoutBuf: Buffer[] = [];
-  const stderrBuf: Buffer[] = [];
-
-  container.modem.demuxStream(stream, {
-    write(chunk: Buffer) {
-      stdoutBuf.push(chunk);
-    },
-  }, {
-    write(chunk: Buffer) {
-      stderrBuf.push(chunk);
-    },
-  });
-
-  await container.start();
-
-  // Write stdin then close
-  if (stdin) {
-    stream.write(stdin);
-  }
-  stream.end();
-
-  // Timeout killer
-  const timer = setTimeout(async () => {
-    timedOut = true;
-    try {
-      await container.kill({ Signal: 'SIGKILL' });
-    } catch {
-      // already dead
-    }
-  }, timeoutMs);
-
-  // Collect memory peak via periodic stat polling
+  let timer: NodeJS.Timeout | null = null;
   let statInterval: NodeJS.Timeout | null = null;
-  if (!isCompile) {
-    statInterval = setInterval(async () => {
-      try {
-        const stats = await container.stats({ stream: false }) as any;
-        const usage = stats?.memory_stats?.usage ?? 0;
-        const kb = Math.ceil(usage / 1024);
-        if (kb > memoryKb) memoryKb = kb;
-      } catch {
-        // container may have already exited
-      }
-    }, 50);
-  }
 
-  // Wait for container to exit
-  const exitData = await container.wait();
-  const runtimeMs = Date.now() - startMs;
-
-  clearTimeout(timer);
-  if (statInterval) clearInterval(statInterval);
-
-  stdout = Buffer.concat(stdoutBuf).toString('utf-8');
-  stderr = Buffer.concat(stderrBuf).toString('utf-8');
-
-  const exitCode: number = exitData.StatusCode ?? -1;
-
-  // OOM: Docker sends SIGKILL (code 137) but not from our timer
-  if (exitCode === 137 && !timedOut) {
-    oomKilled = true;
-  }
-
-  // Remove container (--rm equivalent)
   try {
-    await container.remove({ force: true });
-  } catch {
-    // ignore
-  }
+    // Attach streams BEFORE starting
+    const stream = await container.attach({
+      stream: true,
+      stdin: true,
+      stdout: true,
+      stderr: true,
+    });
 
-  return {
-    exitCode,
-    stdout,
-    stderr,
-    runtimeMs,
-    memoryKb,
-    timedOut,
-    oomKilled,
-    success: exitCode === 0,
-  };
+    // Docker multiplexes stdout/stderr on same stream; demux them
+    const stdoutBuf: Buffer[] = [];
+    const stderrBuf: Buffer[] = [];
+
+    container.modem.demuxStream(stream, {
+      write(chunk: Buffer) {
+        stdoutBuf.push(chunk);
+      },
+    }, {
+      write(chunk: Buffer) {
+        stderrBuf.push(chunk);
+      },
+    });
+
+    await container.start();
+
+    // Write stdin then close
+    if (stdin) {
+      if (typeof stdin === 'string') {
+        stream.write(stdin);
+        stream.end();
+      } else {
+        const readStream = createReadStream(stdin.filePath);
+        readStream.pipe(stream);
+      }
+    } else {
+      stream.end();
+    }
+
+    // Timeout killer
+    timer = setTimeout(async () => {
+      timedOut = true;
+      try {
+        await container.kill({ Signal: 'SIGKILL' });
+      } catch {
+        // already dead
+      }
+    }, timeoutMs);
+
+    // Collect memory peak via periodic stat polling
+    if (!isCompile) {
+      statInterval = setInterval(async () => {
+        try {
+          const stats = await container.stats({ stream: false }) as any;
+          const usage = stats?.memory_stats?.usage ?? 0;
+          const kb = Math.ceil(usage / 1024);
+          if (kb > memoryKb) memoryKb = kb;
+        } catch {
+          // container may have already exited
+        }
+      }, 50);
+    }
+
+    // Wait for container to exit
+    const exitData = await container.wait();
+    const runtimeMs = Date.now() - startMs;
+
+    if (timer) clearTimeout(timer);
+    if (statInterval) clearInterval(statInterval);
+
+    stdout = Buffer.concat(stdoutBuf).toString('utf-8');
+    stderr = Buffer.concat(stderrBuf).toString('utf-8');
+
+    const exitCode: number = exitData.StatusCode ?? -1;
+
+    // OOM: Docker sends SIGKILL (code 137) but not from our timer
+    if (exitCode === 137 && !timedOut) {
+      oomKilled = true;
+    }
+
+    return {
+      exitCode,
+      stdout,
+      stderr,
+      runtimeMs,
+      memoryKb,
+      timedOut,
+      oomKilled,
+      success: exitCode === 0,
+    };
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (statInterval) clearInterval(statInterval);
+    // Remove container (--rm equivalent)
+    try {
+      await container.remove({ force: true });
+    } catch {
+      // ignore
+    }
+  }
 }

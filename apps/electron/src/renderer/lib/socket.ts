@@ -8,7 +8,7 @@ export function getSocket(): Socket {
   if (!_socket) {
     const token = localStorage.getItem('auth_token');
     const socketOptions = {
-      transports: ['websocket', 'polling'] as const,
+      transports: ['websocket', 'polling'],
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 10,
