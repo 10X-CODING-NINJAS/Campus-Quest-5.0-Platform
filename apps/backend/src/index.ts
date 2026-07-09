@@ -1,10 +1,9 @@
-import 'dotenv/config';
+import './config/env.js';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { Server as SocketIOServer } from 'socket.io';
-import { createServer } from 'http';
 import jwt from 'jsonwebtoken';
 
 import problemRoutes from './routes/problems.js';
@@ -50,8 +49,7 @@ async function bootstrap() {
   await fastify.register(authRoutes);
 
   // ── Socket.IO ──────────────────────────────────────────────────────────────
-  const httpServer = createServer(fastify.server);
-  const io = new SocketIOServer(httpServer, {
+  const io = new SocketIOServer(fastify.server, {
     cors: {
       origin: CORS_ORIGINS,
       credentials: true,
@@ -101,16 +99,10 @@ async function bootstrap() {
   startJudgeWorker(io);
 
   // ── Start listening ────────────────────────────────────────────────────────
-  await fastify.ready();
-  await new Promise<void>((resolve, reject) => {
-    httpServer.on('error', reject);
-    httpServer.listen(PORT, HOST, () => {
-      console.log(`\n🚀 Campus Quest Backend running at http://${HOST}:${PORT}`);
-      console.log(`📡 Socket.IO attached`);
-      console.log(`⚖️  Judge Worker started`);
-      resolve();
-    });
-  });
+  await fastify.listen({ port: PORT, host: HOST });
+  console.log(`\n🚀 Campus Quest Backend running at http://${HOST}:${PORT}`);
+  console.log(`📡 Socket.IO attached`);
+  console.log(`⚖️  Judge Worker started`);
 
   // ── Graceful shutdown ──────────────────────────────────────────────────────
   const signals: NodeJS.Signals[] = ['SIGTERM', 'SIGINT'];
