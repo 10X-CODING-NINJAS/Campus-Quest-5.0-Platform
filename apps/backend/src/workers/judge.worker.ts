@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { Worker, Job } from 'bullmq';
 import { connection } from '../config/redis.js';
 import { compile, runTestcase, prepareWorkDir, Verdict } from '../judge/runner.js';

@@ -214,6 +214,7 @@ async function runContainer(opts: ContainerRunOptions): Promise<ContainerRunResu
       stdin: true,
       stdout: true,
       stderr: true,
+      hijack: true,
     });
 
     // Docker multiplexes stdout/stderr on same stream; demux them
@@ -240,6 +241,9 @@ async function runContainer(opts: ContainerRunOptions): Promise<ContainerRunResu
       } else {
         const readStream = createReadStream(stdin.filePath);
         readStream.pipe(stream);
+        readStream.on('end', () => {
+          stream.end();
+        });
       }
     } else {
       stream.end();
