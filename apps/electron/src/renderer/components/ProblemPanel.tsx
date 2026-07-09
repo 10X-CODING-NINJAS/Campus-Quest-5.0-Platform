@@ -1,12 +1,13 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import webBg from '../../Assets/web bg.png';
 
 interface ProblemPanelProps {
   questionNum: number;
   setQuestionNum: React.Dispatch<React.SetStateAction<number>>;
+  problem: any;
+  loading: boolean;
 }
 
-export default function ProblemPanel({ questionNum, setQuestionNum }: ProblemPanelProps) {
+export default function ProblemPanel({ questionNum, setQuestionNum, problem, loading }: ProblemPanelProps) {
   const handlePrevQuestion = () => {
     setQuestionNum(prev => (prev > 1 ? prev - 1 : 10));
   };
@@ -38,60 +39,38 @@ export default function ProblemPanel({ questionNum, setQuestionNum }: ProblemPan
       {/* Mission Brief Badge */}
       <div className="mb-4">
         <div className="bg-[#fde047] border-4 border-black font-display font-black text-sm tracking-widest uppercase w-full text-center py-2 rounded-none shadow-[3px_3px_0px_#000] comic-halftone-yellow">
-          MISSION BRIEF: THE DIMENSIONAL WEAVE
+          {loading ? 'SYNCING MULTIVERSE SIGNAL...' : `MISSION BRIEF: ${problem?.title?.toUpperCase() || 'LOADING...'}`}
         </div>
       </div>
 
-      {/* Description box */}
-      <div className="bg-[#fdf6e2] border-4 border-black p-4 shadow-[4px_4px_0px_#000] rounded-none relative overflow-hidden mb-4">
-        <p className="text-sm font-sans font-extrabold leading-relaxed text-black">
-          The network of the Spider-Verse is connections. Given a work of nodes. Determinet the minimum number of nodes connected all nodes connections. Next m lines contains u, v - an undrected connection and mcnment to connect all nodes together.
-        </p>
-      </div>
-
-      {/* Difficulty Badge */}
-      <div className="text-center mb-4">
-        <div className="bg-[#f97316] border-4 border-black text-black font-display font-black text-sm uppercase px-6 py-2 shadow-[3px_3px_0px_#000] inline-block tracking-wider transform -rotate-1 rounded-none">
-          HARD: WEB OF CONNECTIONS
-        </div>
-      </div>
-
-      {/* Example card */}
-      <div 
-        className="border-4 border-black p-5 shadow-[5px_5px_0px_#000] rounded-none relative overflow-hidden flex flex-col gap-3 min-h-[440px] flex-1"
-        style={{ backgroundImage: `url(${webBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: '#fcf8f2' }}
-      >
-
-        <div className="font-display font-black text-lg text-black mb-1 z-10">
-          Example 1:
-        </div>
-
-        <div className="space-y-4 z-10 flex-1 flex flex-col justify-center">
-          <div>
-            <div className="font-display font-black text-xs uppercase text-gray-800 mb-1">
-              Input
-            </div>
-            <div className="font-mono text-sm bg-[#fdf6e2] text-black p-3.5 border-3 border-black rounded-none shadow-[2px_2px_0px_#000] leading-relaxed w-fit min-w-[140px] font-extrabold">
-              5 3<br />
-              1 2<br />
-              2 3<br />
-              4 5
-            </div>
+      {/* Description & Content Scrollbox */}
+      <div className="bg-[#fdf6e2] border-4 border-black p-5 shadow-[5px_5px_0px_#000] rounded-none flex-1 overflow-y-auto mb-2 flex flex-col gap-4 max-h-[700px]">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 py-20">
+            <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+            <span className="font-mono text-xs uppercase text-zinc-600 font-bold">Synchronizing Multiverse Anchors...</span>
           </div>
-
-          <div>
-            <div className="font-display font-black text-xs uppercase text-gray-800 mb-1">
-              Output
-            </div>
-            <div className="bg-[#fdf6e2] border-3 border-black p-3.5 shadow-[2px_2px_0px_#000] rounded-none">
-              <div className="font-sans text-xs text-black font-extrabold leading-relaxed">
-                <span className="font-display font-black text-xs uppercase text-black block mb-0.5">Explanation:</span>
-                We need one connection between (1,2,3, 4) and (4,5).
-              </div>
-            </div>
+        ) : problem ? (
+          <div className="space-y-4 font-sans text-sm font-extrabold leading-relaxed text-black whitespace-pre-wrap select-text selection:bg-yellow-200">
+            {problem.statement}
           </div>
-        </div>
+        ) : (
+          <div className="text-center font-mono text-xs text-red-600 font-bold py-10">
+            ❌ FAILED TO RESOLVE DIMENSIONAL PACKETS.
+          </div>
+        )}
       </div>
+      
+      {/* Footer Info bar */}
+      {problem && !loading && (
+        <div className="flex justify-between items-center mt-2 px-1 text-[10px] font-mono text-zinc-600 uppercase font-black">
+          <span>TIME LIMIT: {problem.timeLimit}MS</span>
+          <span>MEM LIMIT: {problem.memoryLimit}MB</span>
+          <span className="text-orange-600 bg-orange-100 border border-orange-400 px-2 py-0.5 transform rotate-1">
+            DIFFICULTY: {problem.difficulty}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

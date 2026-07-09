@@ -1,0 +1,9 @@
+{
+  "id": "two-sum",
+  "title": "Two Sum",
+  "difficulty": "Easy",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": ["c", "cpp", "java", "python"],
+  "checkerType": "default"
+}

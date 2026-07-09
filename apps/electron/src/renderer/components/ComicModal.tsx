@@ -10,6 +10,7 @@ interface ComicModalProps {
   runtimeMs: number;
   memoryMb: number;
   message?: string | undefined;
+  solvedCount: number;
 }
 
 export default function ComicModal({
@@ -20,11 +21,48 @@ export default function ComicModal({
   totalCount,
   runtimeMs,
   memoryMb,
-  message
+  message,
+  solvedCount
 }: ComicModalProps) {
   if (!isOpen || status === "IDLE") return null;
 
   const isAccepted = status === "ACCEPTED";
+
+  // Dynamic milestones
+  let milestoneTitle = "Dimension Connected!";
+  let milestoneDescription = "🕸️ Thwip! Miles' neural networks have synchronized with the Multiverse anchors!";
+
+  if (solvedCount === 1) {
+    milestoneTitle = "LATITUDE FRAGMENT 1 RESTORED!";
+    milestoneDescription = "📡 Signal trace initialized. We are mapping the first latitude component.";
+  } else if (solvedCount === 2) {
+    milestoneTitle = "LATITUDE FRAGMENT 2 RESTORED!";
+    milestoneDescription = "📡 Signal strength increasing. Almost locked onto the grid.";
+  } else if (solvedCount === 3) {
+    milestoneTitle = "LATITUDE FULLY DECRYPTED!";
+    milestoneDescription = "🎯 Latitude locked! NYC Location identified: 40.7128° N.";
+  } else if (solvedCount === 4) {
+    milestoneTitle = "LONGITUDE FRAGMENT 1 RESTORED!";
+    milestoneDescription = "📡 Mapping the longitude vectors. Keep going, Spider-Team!";
+  } else if (solvedCount === 5) {
+    milestoneTitle = "LONGITUDE FRAGMENT 2 RESTORED!";
+    milestoneDescription = "📡 Convergence threshold near. Only one longitude fragment left.";
+  } else if (solvedCount === 6) {
+    milestoneTitle = "LONGITUDE DECRYPTED & MAP UNLOCKED!";
+    milestoneDescription = "🎯 Longitude locked: 74.0060° W! Oscorp Manhattan Reactor grid is online.";
+  } else if (solvedCount === 7) {
+    milestoneTitle = "RIDDLE FRAGMENT 1 UNLOCKED!";
+    milestoneDescription = "🧩 The first piece of the final riddle has been decrypted. View it in Hints Map!";
+  } else if (solvedCount === 8) {
+    milestoneTitle = "RIDDLE FRAGMENT 2 UNLOCKED!";
+    milestoneDescription = "🧩 The second riddle fragment is decrypted. We are close to finding the CTF USB.";
+  } else if (solvedCount === 9) {
+    milestoneTitle = "RIDDLE FRAGMENT 3 UNLOCKED!";
+    milestoneDescription = "🧩 Third riddle fragment decrypted. Only one final coordinate block remaining!";
+  } else if (solvedCount >= 10) {
+    milestoneTitle = "FINAL RIDDLE RESOLVED!";
+    milestoneDescription = "🎉 All fragments compiled! The complete riddle is fully decrypted. Moving to physical CTF!";
+  }
 
   return (
     <AnimatePresence>
@@ -91,7 +129,7 @@ export default function ComicModal({
               <div className="bg-yellow-100 border-3 border-black rounded-xl p-3.5 shadow-[3px_3px_0_0_rgba(0,0,0,1)] transform -rotate-1 relative z-10 mb-4">
                 <h4 className="font-sans font-black text-sm uppercase text-black mb-1.5 flex items-center justify-center gap-2">
                   <Trophy className="w-5 h-5 text-yellow-500 animate-bounce" />
-                  Dimension Connected!
+                  {milestoneTitle}
                 </h4>
                 <div className="font-mono text-xs text-zinc-900 space-y-1">
                   <div className="font-extrabold text-green-700">✓ {passedCount}/{totalCount} Test Cases Passed</div>
@@ -105,7 +143,7 @@ export default function ComicModal({
               </div>
 
               <p className="font-mono text-xs text-zinc-700 font-bold mb-2 text-center">
-                🕸️ Thwip! Miles' neural networks have synchronized with the Multiverse anchors!
+                {milestoneDescription}
               </p>
             </div>
           ) : (

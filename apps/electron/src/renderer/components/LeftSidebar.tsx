@@ -13,41 +13,79 @@ interface LeftSidebarProps {
   onSpiderSenseClick?: () => void;
   powerupCounts?: { SPIDER_SENSE: number; WEB_FLUID: number; SUIT_TECH: number };
   onUsePowerup?: (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => void;
+  solvedCount: number;
 }
 
-export default function LeftSidebar({ onSpiderSenseClick, powerupCounts, onUsePowerup }: LeftSidebarProps) {
+export default function LeftSidebar({ onSpiderSenseClick, powerupCounts, onUsePowerup, solvedCount }: LeftSidebarProps) {
   const spideySenseRemaining = 3 - (powerupCounts?.SPIDER_SENSE || 0);
   const webFluidRemaining = 2 - (powerupCounts?.WEB_FLUID || 0);
   const suitTechRemaining = 2 - (powerupCounts?.SUIT_TECH || 0);
+
+  // Compute progress percentages
+  const latProgress = Math.min(solvedCount, 3) / 3 * 100;
+  const longProgress = Math.max(0, Math.min(solvedCount - 3, 3)) / 3 * 100;
+  const riddleProgress = Math.max(0, Math.min(solvedCount - 6, 4)) / 4 * 100;
+
+  // Compute label text
+  const latLabel = solvedCount >= 3 ? "100% (40.7128° N)" : `${Math.round(latProgress)}% (Decrypting)`;
+  const longLabel = solvedCount >= 6 ? "100% (74.0060° W)" : solvedCount < 3 ? "0% (Locked)" : `${Math.round(longProgress)}% (Decrypting)`;
+  const riddleLabel = solvedCount >= 10 ? "100% (Decrypted)" : solvedCount < 6 ? "0% (Locked)" : `${Math.round(riddleProgress)}% (Decrypting)`;
 
   return (
     <aside className="w-full bg-[#fdf6e2] comic-panel flex flex-col select-none p-5 text-black h-fit">
       {/* Team Stats Header */}
       <div className="flex items-center justify-between mb-4 border-b-2 border-black/10 pb-2">
-        <div className="comic-badge-yellow text-sm font-bold tracking-widest uppercase rounded-none">
-          TEAM STATS
+        <div className="comic-badge-yellow text-sm font-bold tracking-widest uppercase rounded-none flex items-center gap-2">
+          TEAM MISSION SUMMARY
+        </div>
+        <div className="font-display font-black text-sm text-red-600 bg-white border-2 border-black px-2 py-0.5 shadow-[1.5px_1.5px_0px_#000]">
+          RESOLVED: {solvedCount} / 10
         </div>
       </div>
 
       {/* Horizontal Split */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Progress Bars */}
-        <div className="space-y-4">
+        <div className="space-y-3">
+          {/* Latitude */}
           <div>
-            <div className="text-black font-display font-bold text-xs uppercase tracking-wider mb-1">
-              FRAGMENT PROGRESS
+            <div className="flex justify-between text-black font-display font-extrabold text-[9px] uppercase tracking-wider mb-0.5">
+              <span>Latitude Signal</span>
+              <span className="text-red-600 font-black">{latLabel}</span>
             </div>
-            <div className="w-full h-6 border-3 border-black bg-stone-700 rounded-none shadow-[2px_2px_0px_#000] overflow-hidden">
-              <div className="h-full bg-[#ef4444] border-r-2 border-black rounded-none" style={{ width: '60%' }} />
+            <div className="w-full h-4 border-2 border-black bg-stone-700 rounded-none shadow-[1.5px_1.5px_0px_#000] overflow-hidden">
+              <div 
+                className="h-full bg-[#ef4444] transition-all duration-500 ease-out" 
+                style={{ width: `${latProgress}%` }} 
+              />
             </div>
           </div>
 
+          {/* Longitude */}
           <div>
-            <div className="text-black font-display font-bold text-xs uppercase tracking-wider mb-1">
-              THWIP COUNT
+            <div className="flex justify-between text-black font-display font-extrabold text-[9px] uppercase tracking-wider mb-0.5">
+              <span>Longitude Signal</span>
+              <span className="text-blue-600 font-black">{longLabel}</span>
             </div>
-            <div className="w-full h-6 border-3 border-black bg-stone-700 rounded-none shadow-[2px_2px_0px_#000] overflow-hidden">
-              <div className="h-full bg-[#3b82f6] border-r-2 border-black rounded-none" style={{ width: '40%' }} />
+            <div className="w-full h-4 border-2 border-black bg-stone-700 rounded-none shadow-[1.5px_1.5px_0px_#000] overflow-hidden">
+              <div 
+                className="h-full bg-[#3b82f6] transition-all duration-500 ease-out" 
+                style={{ width: `${longProgress}%` }} 
+              />
+            </div>
+          </div>
+
+          {/* Riddle */}
+          <div>
+            <div className="flex justify-between text-black font-display font-extrabold text-[9px] uppercase tracking-wider mb-0.5">
+              <span>CTF Riddle Fragments</span>
+              <span className="text-pink-600 font-black">{riddleLabel}</span>
+            </div>
+            <div className="w-full h-4 border-2 border-black bg-stone-700 rounded-none shadow-[1.5px_1.5px_0px_#000] overflow-hidden">
+              <div 
+                className="h-full bg-pink-500 transition-all duration-500 ease-out" 
+                style={{ width: `${riddleProgress}%` }} 
+              />
             </div>
           </div>
         </div>

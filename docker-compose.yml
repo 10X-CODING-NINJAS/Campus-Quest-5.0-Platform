@@ -46,6 +46,39 @@ services:
     profiles:
       - tools
 
+  # ─── Judge Sandbox Images (build only, not run as services) ──────────────────
+  judge-cpp:
+    build:
+      context: ./apps/backend/docker/cpp
+      dockerfile: Dockerfile
+    image: campus-quest-judge-cpp:latest
+    profiles:
+      - build-images
+
+  judge-c:
+    build:
+      context: ./apps/backend/docker/c
+      dockerfile: Dockerfile
+    image: campus-quest-judge-c:latest
+    profiles:
+      - build-images
+
+  judge-java:
+    build:
+      context: ./apps/backend/docker/java
+      dockerfile: Dockerfile
+    image: campus-quest-judge-java:latest
+    profiles:
+      - build-images
+
+  judge-python:
+    build:
+      context: ./apps/backend/docker/python
+      dockerfile: Dockerfile
+    image: campus-quest-judge-python:latest
+    profiles:
+      - build-images
+
 volumes:
   postgres_data:
   redis_data:

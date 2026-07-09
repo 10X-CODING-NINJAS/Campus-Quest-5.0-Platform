@@ -7,68 +7,169 @@ import Diagnostics from './components/Diagnostics';
 import Lobby from './components/Lobby';
 import HintsPage from './components/HintsPage';
 import fullBg from '../Assets/Full bg.png';
-import { socket } from './lib/socket';
+import { socket, reconnectSocket } from './lib/socket';
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3001';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints'>('login');
   const [teamName, setTeamName] = useState('Team Earth-1610');
-  const [questionNum, setQuestionNum] = useState(7);
+  const [questionNum, setQuestionNum] = useState(1);
   const [selectedLang, setSelectedLang] = useState('cpp');
   const [isSaved, setIsSaved] = useState(true);
   const [securityWarning, setSecurityWarning] = useState<string | null>(null);
   const [violationCount, setViolationCount] = useState(0);
   const [isAutoSubmitted, setIsAutoSubmitted] = useState(false);
-  const [contestStatus, setContestStatus] = useState<'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'ENDED'>('NOT_STARTED');
+  const [contestStatus, setContestStatus] = useState<'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'ENDED'>('RUNNING');
   const [isTeamPaused, setIsTeamPaused] = useState(false);
   const [powerupCounts, setPowerupCounts] = useState({ SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 });
 
+  // 10-Problem list and detail states
+  const [problems, setProblems] = useState<any[]>([]);
+  const [problemDetail, setProblemDetail] = useState<any>(null);
+  const [problemsLoading, setProblemsLoading] = useState(false);
+  const [submissionsList, setSubmissionsList] = useState<any[]>([]);
+
+  // Derived solved problem count state
+  const solvedProblemIds = new Set(
+    submissionsList
+      .filter((s: any) => s.verdict === 'AC')
+      .map((s: any) => s.problemId)
+  );
+  const solvedCount = solvedProblemIds.size;
+
+  // Fetch problems list
+  const fetchProblems = async () => {
+    try {
+      setProblemsLoading(true);
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${BACKEND_URL}/api/problems`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Sort by order ascending
+        const sorted = data.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+        setProblems(sorted);
+      }
+    } catch (err) {
+      console.error('[App] Failed to fetch problems list', err);
+    } finally {
+      setProblemsLoading(false);
+    }
+  };
+
+  // Fetch single problem details (statement, samples, etc.)
+  const fetchProblemDetail = async (id: string) => {
+    try {
+      setProblemsLoading(true);
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${BACKEND_URL}/api/problems/${id}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProblemDetail(data);
+      }
+    } catch (err) {
+      console.error('[App] Failed to fetch problem details', err);
+    } finally {
+      setProblemsLoading(false);
+    }
+  };
+
+  // Fetch team's submissions history to count solved problems
+  const fetchSubmissions = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+      const res = await fetch(`${BACKEND_URL}/api/submissions/me`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSubmissionsList(data);
+      }
+    } catch (err) {
+      console.error('[App] Failed to fetch submissions', err);
+    }
+  };
+
+  // Check for stored token and skip login on mount
   useEffect(() => {
-    // Mock socket logic (replace with real socket.io client)
+    const token = localStorage.getItem('auth_token');
+    const storedTeamName = localStorage.getItem('team_name');
+    if (token) {
+      if (storedTeamName) setTeamName(storedTeamName);
+      // Re-initialize socket
+      reconnectSocket(token);
+      setCurrentScreen('coding');
+      fetchProblems();
+      fetchSubmissions();
+    }
+  }, []);
+
+  // Handle successful login/dynamic registration
+  const handleLoginSuccess = (token: string, team: any) => {
+    localStorage.setItem('auth_token', token);
+    localStorage.setItem('team_name', team.name);
+    setTeamName(team.name);
+    reconnectSocket(token);
+    setCurrentScreen('diagnostics');
+    fetchProblems();
+    fetchSubmissions();
+  };
+
+  // Fetch details whenever questionNum or problems list updates
+  useEffect(() => {
+    if (problems.length > 0) {
+      const prob = problems[questionNum - 1];
+      if (prob) {
+        fetchProblemDetail(prob.id);
+      }
+    }
+  }, [questionNum, problems]);
+
+  // Hook up Socket.IO events for live status sync
+  useEffect(() => {
     const handleContestStarted = () => setContestStatus('RUNNING');
+    const handleContestPaused = () => setContestStatus('PAUSED');
+    const handleContestEnded = () => setContestStatus('ENDED');
     const handleTeamPaused = () => setIsTeamPaused(true);
     const handleTeamResumed = () => {
       setIsTeamPaused(false);
       setSecurityWarning(null);
     };
 
-    // If using socket.io:
     socket.on('contest:started', handleContestStarted);
+    socket.on('contest:paused', handleContestPaused);
+    socket.on('contest:ended', handleContestEnded);
     socket.on('team:paused', handleTeamPaused);
     socket.on('team:resumed', handleTeamResumed);
     socket.on('powerup:updated', (counts: any) => setPowerupCounts(counts));
 
-    // Initial sync mock
-    // socket.emit('contest:sync');
-    // socket.on('contest:sync_result', (data) => {
-    //   setContestStatus(data.contestStatus);
-    //   setIsTeamPaused(data.isTeamPaused);
-    //   if (data.powerupCounts) setPowerupCounts(data.powerupCounts);
-    // });
-    
-    // For development without backend, we just set it to RUNNING to allow testing
-    setContestStatus('RUNNING');
+    // When a submit completes, refetch solved count dynamically
+    socket.on('submit:result', () => {
+      fetchSubmissions();
+    });
 
+    // Check security hook in Electron
     if ((window as any).electronAPI?.onSecurityViolation) {
       (window as any).electronAPI.onSecurityViolation((type: string) => {
         setViolationCount((prev) => {
           const newCount = prev + 1;
-          
           if (newCount >= 5) {
             setIsAutoSubmitted(true);
-            setSecurityWarning(null); 
+            setSecurityWarning(null);
           } else {
-            // Emit violation to backend to pause the team
             socket.emit('violation:trigger', { type });
-            
-            // For now, we simulate the socket response to test UI
             setIsTeamPaused(true);
             setSecurityWarning(
-              type === 'blur' 
-                ? `You switched away from the assessment window! (Violation ${newCount}/5)` 
+              type === 'blur'
+                ? `You switched away from the assessment window! (Violation ${newCount}/5)`
                 : `You attempted to exit full screen mode! (Violation ${newCount}/5)`
             );
           }
-          
           return newCount;
         });
       });
@@ -76,18 +177,16 @@ export default function App() {
 
     return () => {
       socket.off('contest:started', handleContestStarted);
+      socket.off('contest:paused', handleContestPaused);
+      socket.off('contest:ended', handleContestEnded);
       socket.off('team:paused', handleTeamPaused);
       socket.off('team:resumed', handleTeamResumed);
-      socket.off('powerup:updated', () => {});
+      socket.off('submit:result');
     };
   }, []);
 
-  // Handler for using a powerup directly via socket
   const handleUsePowerup = (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => {
-    // If using real socket:
     socket.emit('powerup:use', { type });
-    
-    // Mock for UI:
     setPowerupCounts(prev => ({
       ...prev,
       [type]: prev[type] + 1
@@ -95,7 +194,7 @@ export default function App() {
   };
 
   if (currentScreen === 'login') {
-    return <LoginPage onLogin={() => setCurrentScreen('diagnostics')} />;
+    return <LoginPage onLogin={handleLoginSuccess} />;
   }
 
   if (currentScreen === 'diagnostics') {
@@ -104,16 +203,16 @@ export default function App() {
 
   if (currentScreen === 'lobby') {
     return (
-      <Lobby 
-        teamName={teamName} 
-        onTeamNameChange={setTeamName} 
-        onProceed={() => setCurrentScreen('coding')} 
+      <Lobby
+        teamName={teamName}
+        onTeamNameChange={setTeamName}
+        onProceed={() => setCurrentScreen('coding')}
       />
     );
   }
 
   return (
-    <div 
+    <div
       className="flex flex-col h-screen w-screen bg-[#080810] overflow-hidden text-white select-none relative"
       style={{ backgroundImage: `url(${fullBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
     >
@@ -147,7 +246,7 @@ export default function App() {
             
             {/* Developer bypass just for testing the UI locally */}
             <div className="mt-8">
-              <button 
+              <button
                 onClick={() => { setIsTeamPaused(false); setSecurityWarning(null); }}
                 className="text-[10px] text-gray-500 hover:text-gray-300 underline"
               >
@@ -174,7 +273,7 @@ export default function App() {
               <span className="text-red-500 animate-pulse mx-2" style={{animationDelay: '150ms'}}>■</span>
               <span className="text-red-500 animate-pulse" style={{animationDelay: '300ms'}}>■</span>
             </div>
-            <button 
+            <button
               onClick={() => (window as any).electronAPI?.close()}
               className="px-10 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded border-2 border-red-400 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-transform active:translate-y-1 active:translate-x-1 active:shadow-none text-xl tracking-widest"
             >
@@ -185,10 +284,10 @@ export default function App() {
       )}
 
       {/* Custom Header with controls & timer */}
-      <TopBar 
-        isPaused={isTeamPaused || contestStatus !== 'RUNNING'} 
-        teamName={teamName} 
-        onTeamNameChange={setTeamName} 
+      <TopBar
+        isPaused={isTeamPaused || contestStatus !== 'RUNNING'}
+        teamName={teamName}
+        onTeamNameChange={setTeamName}
         currentScreen={currentScreen}
         onNavigate={(screen) => setCurrentScreen(screen)}
       />
@@ -196,18 +295,20 @@ export default function App() {
       {/* Main Workspace Layout */}
       {currentScreen === 'hints' ? (
         <div className="flex-1 w-full relative min-h-0">
-          <HintsPage />
+          <HintsPage solvedCount={solvedCount} />
         </div>
       ) : (
         <div className="flex-1 flex overflow-auto p-6 gap-6 items-start justify-center">
           {/* Mission Brief panel (Left Column) */}
-          <ProblemPanel 
+          <ProblemPanel
             questionNum={questionNum}
             setQuestionNum={setQuestionNum}
+            problem={problemDetail}
+            loading={problemsLoading}
           />
 
           {/* Code Editor, Test cases and Team Stats panel (Right Column) */}
-          <RightPanel 
+          <RightPanel
             questionNum={questionNum}
             selectedLang={selectedLang}
             setSelectedLang={setSelectedLang}
@@ -216,6 +317,10 @@ export default function App() {
             powerupCounts={powerupCounts}
             onUsePowerup={handleUsePowerup}
             onUseSpideySenseSuccess={() => setCurrentScreen('hints')}
+            problem={problemDetail}
+            loading={problemsLoading}
+            solvedCount={solvedCount}
+            onSolveSuccess={fetchSubmissions}
           />
         </div>
       )}

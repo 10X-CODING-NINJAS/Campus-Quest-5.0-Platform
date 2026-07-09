@@ -1,5 +1,5 @@
-import { db } from '../../db';
-import { contests } from '../../db/schema';
+import { db } from '../../db/index.js';
+import { contests } from '../../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
 
 export async function startContest(contestId: string) {

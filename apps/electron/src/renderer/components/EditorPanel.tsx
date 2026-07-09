@@ -1,11 +1,12 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Play, Check, Code, Terminal, Zap } from "lucide-react";
+import Editor from "@monaco-editor/react";
 import { Challenge, SubmissionResult } from "../types";
 
 interface EditorPanelProps {
   activeChallenge: Challenge;
-  language: "cpp" | "python" | "javascript" | "java";
-  setLanguage: (lang: "cpp" | "python" | "javascript" | "java") => void;
+  language: "cpp" | "python" | "c" | "java";
+  setLanguage: (lang: "cpp" | "python" | "c" | "java") => void;
   code: string;
   onChangeCode: (code: string) => void;
   onRunCode: () => void;
@@ -26,12 +27,6 @@ export default function EditorPanel({
   submissionResult,
   consoleLogs
 }: EditorPanelProps) {
-  
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const lineNumbersRef = useRef<HTMLDivElement>(null);
-  const lineCount = code.split("\n").length;
-  const lineNumbers = Array.from({ length: Math.max(1, lineCount) }, (_, i) => i + 1);
-
   // Auto scroll terminal logs
   const logEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -39,30 +34,6 @@ export default function EditorPanel({
       logEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [consoleLogs]);
-
-  // Handle Tab key insertion inside textarea
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const start = e.currentTarget.selectionStart;
-      const end = e.currentTarget.selectionEnd;
-      const newValue = code.substring(0, start) + "    " + code.substring(end);
-      onChangeCode(newValue);
-      
-      // Reset cursor position
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 4;
-        }
-      }, 0);
-    }
-  };
-
-  const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
-    if (lineNumbersRef.current) {
-      lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop;
-    }
-  };
 
   return (
     <div className="w-full lg:w-[820px] bg-[#EAE8E0] border-4 border-black p-4 flex flex-col gap-4 select-none shadow-[6px_6px_0_0_rgba(0,0,0,1)] relative comic-panel comic-halftone">
@@ -87,12 +58,12 @@ export default function EditorPanel({
             Python 3 x
           </button>
           <button
-            onClick={() => setLanguage("javascript")}
+            onClick={() => setLanguage("c")}
             className={`px-3 py-1 border-2 border-black rounded-none text-[10px] font-mono font-black transition shadow-[1px_1px_0_rgba(0,0,0,1)] cursor-pointer ${
-              language === "javascript" ? "bg-sky-500 text-white" : "bg-white text-black hover:bg-zinc-100"
+              language === "c" ? "bg-sky-500 text-white" : "bg-white text-black hover:bg-zinc-100"
             }`}
           >
-            JS/TS x
+            C17 x
           </button>
           <button
             onClick={() => setLanguage("java")}
@@ -106,35 +77,29 @@ export default function EditorPanel({
         
         <div className="flex items-center gap-1 font-mono text-[9px] text-zinc-500 font-bold uppercase">
           <Code className="w-3.5 h-3.5 text-zinc-600 animate-pulse" />
-          {language === "cpp" ? "main.cpp" : language === "python" ? "main.py" : language === "java" ? "Main.java" : "main.ts"}
+          {language === "cpp" ? "main.cpp" : language === "python" ? "main.py" : language === "java" ? "Main.java" : "main.c"}
         </div>
       </div>
 
-      {/* 2. Main IDE Textarea with line numbers */}
-      <div className="flex font-mono text-xs bg-[#1E1E1E] text-[#D4D4D4] rounded-none border-3 border-black overflow-hidden h-[480px] shadow-[3px_3px_0_0_rgba(0,0,0,1)] relative">
-        {/* Line Numbers Sidebar */}
-        <div 
-          ref={lineNumbersRef}
-          className="bg-[#151515] select-none text-zinc-600 py-3 px-2 text-right min-w-[34px] border-r border-zinc-800 text-[11px] font-semibold leading-5 overflow-hidden"
-        >
-          {lineNumbers.map((n) => (
-            <div key={n} className="h-5">
-              {n}
-            </div>
-          ))}
-        </div>
-        
-        {/* Textarea Input overlay */}
-        <textarea
-          ref={textareaRef}
+      {/* 2. Main IDE Monaco Editor */}
+      <div className="flex bg-[#1E1E1E] rounded-none border-3 border-black overflow-hidden h-[480px] shadow-[3px_3px_0_0_rgba(0,0,0,1)] relative w-full">
+        <Editor
+          height="100%"
+          width="100%"
+          language={language === "cpp" ? "cpp" : language === "python" ? "python" : language === "java" ? "java" : "c"}
           value={code}
-          onChange={(e) => onChangeCode(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onScroll={handleScroll}
-          spellCheck="false"
-          className="flex-1 bg-transparent p-3 text-[#E0E0E0] outline-none resize-none font-mono text-[11px] leading-5 whitespace-pre overflow-auto scrollbar-thin scrollbar-thumb-zinc-700"
-          style={{ tabSize: 4 }}
-          placeholder="// Type your multi-dimensional Spider algorithm here..."
+          onChange={(v) => onChangeCode(v ?? "")}
+          theme="vs-dark"
+          options={{
+            fontSize: 12,
+            minimap: { enabled: false },
+            automaticLayout: true,
+            scrollBeyondLastLine: false,
+            contextmenu: false,
+            fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+            lineNumbersMinChars: 3,
+            tabSize: 4,
+          }}
         />
       </div>
 
