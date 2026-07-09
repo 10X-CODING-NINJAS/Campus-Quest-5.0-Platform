@@ -12,6 +12,7 @@ export interface TestcaseRunResult {
   stderr: string;
   runtimeMs: number;
   memoryKb: number;
+  expectedOutput?: string;
 }
 
 export interface RunResult {

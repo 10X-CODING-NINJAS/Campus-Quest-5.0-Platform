@@ -7,7 +7,7 @@ import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-import { Lock, Eye } from 'lucide-react';
+import { Lock } from 'lucide-react';
 
 interface HintsPageProps {
   solvedCount: number;

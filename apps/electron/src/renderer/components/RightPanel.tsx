@@ -4,7 +4,7 @@ import ComicModal from './ComicModal';
 import EditorPanel from './EditorPanel';
 import SpideySenseModal from './SpideySenseModal';
 import { Challenge, SubmissionResult } from '../types';
-import { useJudge, Verdict } from '../hooks/useJudge';
+import { useJudge } from '../hooks/useJudge';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3001';
 
@@ -39,7 +39,7 @@ export default function RightPanel({
   onUsePowerup,
   onUseSpideySenseSuccess,
   problem,
-  loading,
+  loading: _loading,
   solvedCount,
   onSolveSuccess
 }: RightPanelProps) {
@@ -286,7 +286,7 @@ export default function RightPanel({
       <ComicModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        status={submissionResult.status}
+        status={modalStatus}
         passedCount={submissionResult.passedCount || 0}
         totalCount={submissionResult.totalCount || 0}
         runtimeMs={submissionResult.runtimeMs || 0}
@@ -304,4 +304,3 @@ export default function RightPanel({
     </div>
   );
 }
-

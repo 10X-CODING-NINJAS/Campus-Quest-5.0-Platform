@@ -1,5 +1,4 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import webBg from '../../Assets/web bg.png';
 
 interface ProblemPanelProps {
   questionNum: number;
