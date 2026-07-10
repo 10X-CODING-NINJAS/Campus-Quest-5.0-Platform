@@ -7,7 +7,7 @@ import Diagnostics from './components/Diagnostics';
 import Lobby from './components/Lobby';
 import HintsPage from './components/HintsPage';
 import fullBg from '../Assets/Full bg.png';
-import { getSocket, reconnectSocket } from './lib/socket';
+import { getSocket, reconnectSocket, onConnectionChange } from './lib/socket';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3001';
 const CONTEST_STATES = ['WAITING', 'DIAGNOSTICS', 'LOBBY', 'LIVE', 'PAUSED', 'MISSION_MODE', 'ENDED'] as const;

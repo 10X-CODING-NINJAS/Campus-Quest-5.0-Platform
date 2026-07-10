@@ -65,8 +65,25 @@ export async function getContestStateSnapshot(): Promise<ContestStateSnapshot> {
   return toSnapshot(created);
 }
 
+const VALID_TRANSITIONS: Record<ContestState, ContestState[]> = {
+  WAITING: ['DIAGNOSTICS', 'LOBBY', 'LIVE', 'ENDED'],
+  DIAGNOSTICS: ['WAITING', 'LOBBY', 'LIVE', 'ENDED'],
+  LOBBY: ['WAITING', 'DIAGNOSTICS', 'LIVE', 'ENDED'],
+  LIVE: ['PAUSED', 'MISSION_MODE', 'ENDED'],
+  PAUSED: ['LIVE', 'ENDED'],
+  MISSION_MODE: ['LIVE', 'ENDED'],
+  ENDED: ['WAITING'],
+};
+
 export async function setContestState(state: ContestState): Promise<ContestStateSnapshot> {
   const current = await getContestStateSnapshot();
+  
+  // Validate state transition
+  const allowed = VALID_TRANSITIONS[current.state] ?? [];
+  if (current.state !== state && !allowed.includes(state)) {
+    throw new Error(`Invalid contest state transition from ${current.state} to ${state}`);
+  }
+
   const [contest] = await db.select().from(contests).limit(1);
   const now = new Date();
 

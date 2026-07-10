@@ -3,6 +3,19 @@ import { io, Socket } from 'socket.io-client';
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3001';
 
 let _socket: Socket | null = null;
+const connectionListeners = new Set<(online: boolean) => void>();
+
+export function onConnectionChange(cb: (online: boolean) => void) {
+  connectionListeners.add(cb);
+  if (_socket) {
+    cb(_socket.connected);
+  }
+  return () => connectionListeners.delete(cb);
+}
+
+function notifyListeners(online: boolean) {
+  connectionListeners.forEach(cb => cb(online));
+}
 
 export function getSocket(): Socket {
   if (!_socket) {
@@ -11,8 +24,10 @@ export function getSocket(): Socket {
       transports: ['websocket', 'polling'],
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 15,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      randomizationFactor: 0.5,
       ...(token ? { auth: { token } } : {}),
     };
 
@@ -20,14 +35,17 @@ export function getSocket(): Socket {
 
     _socket.on('connect', () => {
       console.log('[Socket] Connected:', _socket?.id);
+      notifyListeners(true);
     });
 
     _socket.on('disconnect', (reason) => {
       console.warn('[Socket] Disconnected:', reason);
+      notifyListeners(false);
     });
 
     _socket.on('connect_error', (err) => {
       console.error('[Socket] Connection error:', err.message);
+      notifyListeners(false);
     });
   }
   return _socket;
