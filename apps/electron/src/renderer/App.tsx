@@ -23,12 +23,17 @@ interface ContestStateSnapshot {
   durationMs: number;
 }
 
+interface HintProgressSnapshot {
+  teamId: string;
+  questionsSolved: number;
+  hintProgress: 0 | 1 | 2 | 3;
+  missionCompleted: boolean;
+}
+
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints'>('login');
   const [teamName, setTeamName] = useState('Team Earth-1610');
   const [questionNum, setQuestionNum] = useState(1);
-  const [selectedLang, setSelectedLang] = useState('cpp');
-  const [isSaved, setIsSaved] = useState(true);
   const [securityWarning, setSecurityWarning] = useState<string | null>(null);
   const [violationCount, setViolationCount] = useState(0);
   const [isAutoSubmitted, setIsAutoSubmitted] = useState(false);
@@ -36,21 +41,15 @@ export default function App() {
   const [previousLiveScreen, setPreviousLiveScreen] = useState<'coding' | 'hints'>('coding');
   const [isTeamPaused, setIsTeamPaused] = useState(false);
   const [powerupCounts, setPowerupCounts] = useState({ SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 });
+  const [questionsSolved, setQuestionsSolved] = useState(0);
+  const [hintProgress, setHintProgress] = useState<0 | 1 | 2 | 3>(0);
+  const [missionCompleted, setMissionCompleted] = useState(false);
   const [socketEpoch, setSocketEpoch] = useState(0);
 
   // 10-Problem list and detail states
   const [problems, setProblems] = useState<any[]>([]);
   const [problemDetail, setProblemDetail] = useState<any>(null);
   const [problemsLoading, setProblemsLoading] = useState(false);
-  const [submissionsList, setSubmissionsList] = useState<any[]>([]);
-
-  // Derived solved problem count state
-  const solvedProblemIds = new Set(
-    submissionsList
-      .filter((s: any) => s.verdict === 'AC')
-      .map((s: any) => s.problemId)
-  );
-  const solvedCount = solvedProblemIds.size;
 
   // Fetch problems list
   const fetchProblems = async () => {
@@ -102,7 +101,7 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
-        setSubmissionsList(data);
+        void data;
       }
     } catch (err) {
       console.error('[App] Failed to fetch submissions', err);
@@ -176,11 +175,22 @@ export default function App() {
       contestState?: ContestStateSnapshot;
       isTeamPaused?: boolean;
       powerupCounts?: typeof powerupCounts;
+      hintProgress?: HintProgressSnapshot;
     }) => {
       if (payload.contestState) handleContestState(payload.contestState);
       else if (payload.contestStatus && CONTEST_STATES.includes(payload.contestStatus)) setContestState(payload.contestStatus);
       if (typeof payload.isTeamPaused === 'boolean') setIsTeamPaused(payload.isTeamPaused);
       if (payload.powerupCounts) setPowerupCounts(payload.powerupCounts);
+      if (payload.hintProgress) {
+        setQuestionsSolved(payload.hintProgress.questionsSolved);
+        setHintProgress(payload.hintProgress.hintProgress);
+        setMissionCompleted(payload.hintProgress.missionCompleted);
+      }
+    };
+    const handleHintUpdate = (snapshot: HintProgressSnapshot) => {
+      setQuestionsSolved(snapshot.questionsSolved);
+      setHintProgress(snapshot.hintProgress);
+      setMissionCompleted(snapshot.missionCompleted);
     };
     const handleTeamPaused = () => setIsTeamPaused(true);
     const handleTeamResumed = () => {
@@ -191,6 +201,7 @@ export default function App() {
     activeSocket.on('connect', requestSync);
     activeSocket.on('contest:state', handleContestState);
     activeSocket.on('contest:sync_result', handleSyncResult);
+    activeSocket.on('hint:update', handleHintUpdate);
     activeSocket.on('team:paused', handleTeamPaused);
     activeSocket.on('team:resumed', handleTeamResumed);
     activeSocket.on('powerup:updated', (counts: any) => setPowerupCounts(counts));
@@ -227,6 +238,7 @@ export default function App() {
       activeSocket.off('connect', requestSync);
       activeSocket.off('contest:state', handleContestState);
       activeSocket.off('contest:sync_result', handleSyncResult);
+      activeSocket.off('hint:update', handleHintUpdate);
       activeSocket.off('team:paused', handleTeamPaused);
       activeSocket.off('team:resumed', handleTeamResumed);
       activeSocket.off('submit:result');
@@ -371,7 +383,7 @@ export default function App() {
       {/* Main Workspace Layout */}
       {currentScreen === 'hints' ? (
         <div className="flex-1 w-full relative min-h-0">
-          <HintsPage solvedCount={solvedCount} />
+          <HintsPage questionsSolved={questionsSolved} hintProgress={hintProgress} missionCompleted={missionCompleted} />
         </div>
       ) : (
         <div className="flex-1 flex overflow-auto p-6 gap-6 items-start justify-center">
@@ -386,16 +398,12 @@ export default function App() {
           {/* Code Editor, Test cases and Team Stats panel (Right Column) */}
           <RightPanel
             questionNum={questionNum}
-            selectedLang={selectedLang}
-            setSelectedLang={setSelectedLang}
-            isSaved={isSaved}
-            setIsSaved={setIsSaved}
             powerupCounts={powerupCounts}
             onUsePowerup={handleUsePowerup}
             onUseSpideySenseSuccess={() => setCurrentScreen('hints')}
             problem={problemDetail}
             loading={problemsLoading}
-            solvedCount={solvedCount}
+            questionsSolved={questionsSolved}
             onSolveSuccess={fetchSubmissions}
           />
         </div>

@@ -1,50 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import LeftSidebar from './LeftSidebar';
 import ComicModal from './ComicModal';
 import EditorPanel from './EditorPanel';
 import SpideySenseModal from './SpideySenseModal';
 import { Challenge, SubmissionResult } from '../types';
 import { useJudge } from '../hooks/useJudge';
+import { getSocket } from '../lib/socket';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3001';
 
-const C_TEMPLATE = `#include <stdio.h>\n\nint main() {\n    // Write your C17 code here\n    return 0;\n}\n`;
-
 const CXX_TEMPLATE = `#include <iostream>\n#include <vector>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    \n    // Write your C++17 code here\n    \n    return 0;\n}\n`;
-
-const PY_TEMPLATE = `import sys\n\ndef main():\n    # Write your Python 3 code here\n    pass\n\nif __name__ == '__main__':\n    main()\n`;
-
-const JAVA_TEMPLATE = `import java.util.Scanner;\n\nclass Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        \n        // Write your Java 21 code here\n        \n    }\n}\n`;
 
 interface RightPanelProps {
   questionNum: number;
-  selectedLang: string;
-  setSelectedLang: (lang: string) => void;
-  isSaved: boolean;
-  setIsSaved: React.Dispatch<React.SetStateAction<boolean>>;
   powerupCounts: { SPIDER_SENSE: number; WEB_FLUID: number; SUIT_TECH: number };
   onUsePowerup: (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => void;
   onUseSpideySenseSuccess?: () => void;
   problem: any;
   loading: boolean;
-  solvedCount: number;
+  questionsSolved: number;
   onSolveSuccess: () => void;
 }
 
 export default function RightPanel({
-  selectedLang,
-  setSelectedLang,
-  setIsSaved,
   powerupCounts,
   onUsePowerup,
   onUseSpideySenseSuccess,
   problem,
   loading: _loading,
-  solvedCount,
+  questionsSolved,
   onSolveSuccess
 }: RightPanelProps) {
-  // Monaco language code buffer state
-  const [codes, setCodes] = useState<Record<string, string>>({});
+  const [workspaceCode, setWorkspaceCode] = useState('');
+  const [workspaceLanguage, setWorkspaceLanguage] = useState<'cpp' | 'python' | 'c' | 'java'>('cpp');
+  const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
+  const [scrollTop, setScrollTop] = useState(0);
+  const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
+  const [workspaceMeta, setWorkspaceMeta] = useState<{ latestVerdict?: string | null; latestRuntimeMs?: number | null; latestMemoryKb?: number | null; lastSavedAt?: string | null }>({});
+  const saveTimerRef = useRef<number | null>(null);
 
   // Judge states
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
@@ -58,55 +51,92 @@ export default function RightPanel({
 
   const [isSpideyModalOpen, setIsSpideyModalOpen] = useState(false);
 
-  const mappedLang = selectedLang === 'c' ? 'c' : selectedLang === 'python' ? 'python' : selectedLang === 'java' ? 'java' : 'cpp';
+  const mappedLang = workspaceLanguage;
 
   // Instantiate the judge integration hook
   const { runCode, submitCode, isRunning, isSubmitting } = useJudge({
     problemId: problem?.id ?? '',
   });
 
+  useEffect(() => {
+    setWorkspaceLoaded(false);
+    if (!problem?.id) return;
+    const socket = getSocket();
+    socket.emit('workspace:sync');
+    const onSnapshot = (payload: { workspaces: any[] }) => {
+      const found = payload.workspaces.find((item) => item.problemId === problem.id);
+      if (found) {
+        setWorkspaceCode(found.sourceCode ?? '');
+        setWorkspaceLanguage(found.selectedLanguage ?? 'cpp');
+        setCursorPosition({ line: found.cursorLine ?? 1, column: found.cursorColumn ?? 1 });
+        setScrollTop(found.scrollTop ?? 0);
+        setWorkspaceMeta({
+          latestVerdict: found.latestVerdict,
+          latestRuntimeMs: found.latestRuntimeMs,
+          latestMemoryKb: found.latestMemoryKb,
+          lastSavedAt: found.lastSavedAt,
+        });
+      } else {
+        const backendLangKey = 'cpp';
+        const starter = problem.starterCode?.[backendLangKey];
+        setWorkspaceCode(starter || CXX_TEMPLATE);
+        setWorkspaceLanguage('cpp');
+        setCursorPosition({ line: 1, column: 1 });
+        setScrollTop(0);
+        setWorkspaceMeta({});
+      }
+      setWorkspaceLoaded(true);
+    };
+    const onSaved = (saved: any) => {
+      if (saved.problemId !== problem.id) return;
+      setWorkspaceMeta({
+        latestVerdict: saved.latestVerdict,
+        latestRuntimeMs: saved.latestRuntimeMs,
+        latestMemoryKb: saved.latestMemoryKb,
+        lastSavedAt: saved.lastSavedAt,
+      });
+    };
+    socket.on('workspace:snapshot', onSnapshot);
+    socket.on('workspace:saved', onSaved);
+    return () => {
+      socket.off('workspace:snapshot', onSnapshot);
+      socket.off('workspace:saved', onSaved);
+    };
+  }, [problem?.id]);
+
+  useEffect(() => {
+    if (!workspaceLoaded || !problem?.id) return;
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => {
+      getSocket().emit('workspace:update', {
+        problemId: problem.id,
+        sourceCode: workspaceCode,
+        selectedLanguage: workspaceLanguage,
+        cursorLine: cursorPosition.line,
+        cursorColumn: cursorPosition.column,
+        scrollTop,
+        latestVerdict: workspaceMeta.latestVerdict ?? null,
+        latestRuntimeMs: workspaceMeta.latestRuntimeMs ?? null,
+        latestMemoryKb: workspaceMeta.latestMemoryKb ?? null,
+      });
+    }, 2000);
+    return () => {
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    };
+  }, [workspaceCode, workspaceLanguage, cursorPosition, scrollTop, problem?.id, workspaceLoaded]);
+
   // Load code from LocalStorage or starterCode when problem or language switches
   useEffect(() => {
-    if (!problem) return;
-
-    const storedCode = localStorage.getItem(`code:${problem.id}:${mappedLang}`);
-    if (storedCode) {
-      setCodes(prev => ({ ...prev, [mappedLang]: storedCode }));
-    } else {
-      // Fallback to dynamic problem starter codes, then default static templates
-      const backendLangKey = mappedLang === 'cpp' ? 'cpp' : mappedLang === 'python' ? 'python' : mappedLang === 'java' ? 'java' : 'c';
-      const starter = problem.starterCode?.[backendLangKey];
-      if (starter) {
-        setCodes(prev => ({ ...prev, [mappedLang]: starter }));
-      } else {
-        const defaultTemplate = 
-          mappedLang === 'c' ? C_TEMPLATE :
-          mappedLang === 'cpp' ? CXX_TEMPLATE :
-          mappedLang === 'python' ? PY_TEMPLATE :
-          JAVA_TEMPLATE;
-        setCodes(prev => ({ ...prev, [mappedLang]: defaultTemplate }));
-      }
-    }
-    
     setConsoleLogs([`⚙ Terminal ready. Waiting for code compilation...`]);
     setModalStatus('IDLE');
-  }, [problem, mappedLang]);
+  }, [problem]);
 
   // Handle Monaco changes with immediate state saving (Autosave!)
   const handleEditorChange = (value: string) => {
-    setCodes(prev => ({
-      ...prev,
-      [mappedLang]: value,
-    }));
-    setIsSaved(false);
-
-    if (problem) {
-      localStorage.setItem(`code:${problem.id}:${mappedLang}`, value);
-    }
-    setTimeout(() => setIsSaved(true), 400);
+    setWorkspaceCode(value);
   };
 
-  const currentCode = codes[mappedLang] || '';
+  const currentCode = workspaceCode || '';
 
   // ── Run Code (compile & run against sample test cases only) ──────────────────
   const handleRunCode = async () => {
@@ -238,6 +268,19 @@ export default function RightPanel({
       if (isAc) {
         onSolveSuccess(); // trigger refetching submissions list to update solvedCount
       }
+      if (problem?.id) {
+        getSocket().emit('workspace:update', {
+          problemId: problem.id,
+          sourceCode: currentCode,
+          selectedLanguage: workspaceLanguage,
+          cursorLine: cursorPosition.line,
+          cursorColumn: cursorPosition.column,
+          scrollTop,
+          latestVerdict: res.verdict,
+          latestRuntimeMs: res.runtimeMs,
+          latestMemoryKb: res.memoryKb,
+        });
+      }
     } catch (err) {
       setConsoleLogs(prev => [...prev, `✗ Submission failed: connection timeout.`]);
     }
@@ -264,22 +307,30 @@ export default function RightPanel({
       <EditorPanel
         activeChallenge={activeChallenge}
         language={mappedLang}
-        setLanguage={(lang) => setSelectedLang(lang)}
+        setLanguage={(lang) => setWorkspaceLanguage(lang)}
         code={currentCode}
         onChangeCode={handleEditorChange}
-        onRunCode={handleRunCode}
-        onSubmitCode={handleSubmitCode}
-        onUseSpideySense={() => setIsSpideyModalOpen(true)}
-        submissionResult={submissionResult}
-        consoleLogs={consoleLogs}
-      />
+        onCursorChange={(line, column) => setCursorPosition({ line, column })}
+        onScrollChange={(top) => setScrollTop(top)}
+      onRunCode={handleRunCode}
+      onSubmitCode={handleSubmitCode}
+      onUseSpideySense={() => setIsSpideyModalOpen(true)}
+      submissionResult={submissionResult}
+      consoleLogs={consoleLogs}
+      onMountEditor={(editor) => {
+        editor.setPosition(cursorPosition);
+        editor.setScrollTop(scrollTop);
+      }}
+    />
 
       {/* Team Stats Panel Card */}
       <LeftSidebar 
         onSpiderSenseClick={() => setIsSpideyModalOpen(true)} 
         powerupCounts={powerupCounts}
         onUsePowerup={onUsePowerup}
-        solvedCount={solvedCount}
+        questionsSolved={questionsSolved}
+        hintProgress={Math.min(Math.floor(questionsSolved / 3), 3) as 0 | 1 | 2 | 3}
+        missionCompleted={questionsSolved >= 10}
       />
 
       {/* Comic Book Alert Modal */}
@@ -292,7 +343,7 @@ export default function RightPanel({
         runtimeMs={submissionResult.runtimeMs || 0}
         memoryMb={submissionResult.memoryMb || 0}
         message={submissionResult.message}
-        solvedCount={solvedCount}
+        solvedCount={questionsSolved}
       />
 
       {/* Spidey Sense usage modal */}

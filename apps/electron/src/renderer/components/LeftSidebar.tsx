@@ -13,23 +13,25 @@ interface LeftSidebarProps {
   onSpiderSenseClick?: () => void;
   powerupCounts?: { SPIDER_SENSE: number; WEB_FLUID: number; SUIT_TECH: number };
   onUsePowerup?: (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => void;
-  solvedCount: number;
+  questionsSolved: number;
+  hintProgress: 0 | 1 | 2 | 3;
+  missionCompleted: boolean;
 }
 
-export default function LeftSidebar({ onSpiderSenseClick, powerupCounts, onUsePowerup, solvedCount }: LeftSidebarProps) {
+export default function LeftSidebar({ onSpiderSenseClick, powerupCounts, onUsePowerup, questionsSolved, hintProgress, missionCompleted }: LeftSidebarProps) {
   const spideySenseRemaining = 3 - (powerupCounts?.SPIDER_SENSE || 0);
   const webFluidRemaining = 2 - (powerupCounts?.WEB_FLUID || 0);
   const suitTechRemaining = 2 - (powerupCounts?.SUIT_TECH || 0);
 
   // Compute progress percentages
-  const latProgress = Math.min(solvedCount, 3) / 3 * 100;
-  const longProgress = Math.max(0, Math.min(solvedCount - 3, 3)) / 3 * 100;
-  const riddleProgress = Math.max(0, Math.min(solvedCount - 6, 4)) / 4 * 100;
+  const latProgress = Math.min(questionsSolved, 3) / 3 * 100;
+  const longProgress = Math.max(0, Math.min(questionsSolved - 3, 3)) / 3 * 100;
+  const riddleProgress = Math.max(0, Math.min(questionsSolved - 6, 4)) / 4 * 100;
 
   // Compute label text
-  const latLabel = solvedCount >= 3 ? "100% (40.7128° N)" : `${Math.round(latProgress)}% (Decrypting)`;
-  const longLabel = solvedCount >= 6 ? "100% (74.0060° W)" : solvedCount < 3 ? "0% (Locked)" : `${Math.round(longProgress)}% (Decrypting)`;
-  const riddleLabel = solvedCount >= 10 ? "100% (Decrypted)" : solvedCount < 6 ? "0% (Locked)" : `${Math.round(riddleProgress)}% (Decrypting)`;
+  const latLabel = questionsSolved >= 3 ? "100% (40.7128° N)" : `${Math.round(latProgress)}% (Decrypting)`;
+  const longLabel = questionsSolved >= 6 ? "100% (74.0060° W)" : questionsSolved < 3 ? "0% (Locked)" : `${Math.round(longProgress)}% (Decrypting)`;
+  const riddleLabel = questionsSolved >= 10 ? "100% (Decrypted)" : questionsSolved < 6 ? "0% (Locked)" : `${Math.round(riddleProgress)}% (Decrypting)`;
 
   return (
     <aside className="w-full bg-[#fdf6e2] comic-panel flex flex-col select-none p-5 text-black h-fit">
@@ -39,7 +41,7 @@ export default function LeftSidebar({ onSpiderSenseClick, powerupCounts, onUsePo
           TEAM MISSION SUMMARY
         </div>
         <div className="font-display font-black text-sm text-red-600 bg-white border-2 border-black px-2 py-0.5 shadow-[1.5px_1.5px_0px_#000]">
-          RESOLVED: {solvedCount} / 10
+          RESOLVED: {questionsSolved} / 10
         </div>
       </div>
 
@@ -138,6 +140,10 @@ export default function LeftSidebar({ onSpiderSenseClick, powerupCounts, onUsePo
               <div className="text-[9px] text-gray-500 font-semibold mt-1">Remaining: {suitTechRemaining}</div>
             </div>
           </div>
+        </div>
+
+        <div className="mt-4 text-[10px] font-black uppercase tracking-widest text-emerald-700">
+          Mission Status: {missionCompleted ? 'Completed' : hintProgress > 0 ? 'In Progress' : 'Not Started'}
         </div>
       </div>
     </aside>

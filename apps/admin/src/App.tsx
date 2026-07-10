@@ -1,17 +1,47 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { io } from 'socket.io-client';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 const CONTEST_STATES = ['WAITING', 'DIAGNOSTICS', 'LOBBY', 'LIVE', 'PAUSED', 'MISSION_MODE', 'ENDED'] as const;
 type ContestState = (typeof CONTEST_STATES)[number];
+type TeamRow = {
+  id: string;
+  name: string;
+  email: string;
+  violationCount: number;
+  isPaused: boolean;
+  isDisqualified: boolean;
+  spiderSenseCharges: number;
+  questionsSolved: number;
+  hintProgress: 0 | 1 | 2 | 3;
+  missionCompleted: boolean;
+  createdAt: string;
+};
 
 export default function App() {
   const [status, setStatus] = useState<string>('Unknown');
   const [error, setError] = useState<string | null>(null);
   const [adminToken, setAdminToken] = useState('change-me-in-production');
   const [contestState, setContestState] = useState<ContestState>('WAITING');
+  const [teams, setTeams] = useState<TeamRow[]>([]);
 
   useEffect(() => {
+    const s = io(API_URL, { transports: ['websocket', 'polling'] });
+    s.on('contest:state', (snapshot: { state: ContestState }) => {
+      setContestState(snapshot.state);
+    });
+    const refreshTeams = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/admin/teams`, {
+          headers: { 'x-admin-token': adminToken },
+        });
+        setTeams(res.data);
+      } catch {}
+    };
+    s.on('hint:update', refreshTeams);
+    s.on('connect', refreshTeams);
+
     axios.get(`${API_URL}/admin/contest/state`)
       .then((res) => {
         if (CONTEST_STATES.includes(res.data.state)) {
@@ -20,6 +50,13 @@ export default function App() {
         }
       })
       .catch(() => setStatus('Unable to load current state'));
+
+    return () => {
+      s.off('contest:state');
+      s.off('hint:update');
+      s.off('connect');
+      s.disconnect();
+    };
   }, []);
 
   const handleAction = async (action: 'start' | 'pause' | 'end') => {
@@ -52,7 +89,7 @@ export default function App() {
     }
   };
 
-  return (
+    return (
     <div className="min-h-screen bg-slate-100 p-8">
       <div className="max-w-4xl mx-auto space-y-8">
         
@@ -127,6 +164,34 @@ export default function App() {
           
           <div className="mt-6 p-4 bg-slate-50 rounded-lg text-sm text-slate-600">
             Last Action Status: <span className="font-mono font-bold text-slate-800">{status}</span>
+          </div>
+        </section>
+
+        <section className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <h2 className="text-xl font-semibold mb-4">Live Team Progress</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-slate-500 uppercase text-xs">
+                <tr>
+                  <th className="py-2">Team</th>
+                  <th className="py-2">Solved</th>
+                  <th className="py-2">Hint Progress</th>
+                  <th className="py-2">Mission</th>
+                  <th className="py-2">Contest</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teams.map((team) => (
+                  <tr key={team.id} className="border-t border-slate-200">
+                    <td className="py-3 font-medium text-slate-800">{team.name}</td>
+                    <td className="py-3 text-slate-700">{team.questionsSolved} / 10</td>
+                    <td className="py-3 text-slate-700">{team.hintProgress} / 3</td>
+                    <td className="py-3 text-slate-700">{team.missionCompleted ? 'Completed' : 'In Progress'}</td>
+                    <td className="py-3 text-slate-700">{contestState}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
         

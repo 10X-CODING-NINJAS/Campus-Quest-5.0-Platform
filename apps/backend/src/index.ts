@@ -8,11 +8,13 @@ import jwt from 'jsonwebtoken';
 
 import problemRoutes from './routes/problems.js';
 import submissionRoutes from './routes/submissions.js';
+import workspaceRoutes from './routes/workspaces.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
 import { registerJudgeHandlers } from './socket/judge.handler.js';
 import { registerContestHandlers } from './socket/contest.handler.js';
+import { registerWorkspaceHandlers } from './socket/workspace.handler.js';
 import { registerPowerupHandlers } from './socket/powerup.handler.js';
 import { startJudgeWorker } from './workers/judge.worker.js';
 import { connection } from './config/redis.js';
@@ -44,6 +46,7 @@ async function bootstrap() {
   // Register all API routes
   await fastify.register(problemRoutes);
   await fastify.register(submissionRoutes);
+  await fastify.register(workspaceRoutes);
   await fastify.register(leaderboardRoutes);
   await fastify.register(adminRoutes);
   await fastify.register(authRoutes);
@@ -88,6 +91,7 @@ async function bootstrap() {
 
     registerJudgeHandlers(socket, io);
     registerContestHandlers(socket);
+    registerWorkspaceHandlers(socket);
     registerPowerupHandlers(socket);
 
     socket.on('disconnect', () => {

@@ -79,6 +79,9 @@ export default async function adminRoutes(fastify: FastifyInstance) {
       isPaused: t.isPaused,
       isDisqualified: t.isDisqualified,
       spiderSenseCharges: t.spiderSenseCharges,
+      questionsSolved: t.questionsSolved,
+      hintProgress: t.hintProgress,
+      missionCompleted: t.missionCompleted,
       createdAt: t.createdAt,
     })));
   });
