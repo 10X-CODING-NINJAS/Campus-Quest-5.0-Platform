@@ -11,6 +11,7 @@ import submissionRoutes from './routes/submissions.js';
 import workspaceRoutes from './routes/workspaces.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import adminRoutes from './routes/admin.js';
+import problemAdminRoutes from './routes/admin/problem-admin.js';
 import authRoutes from './routes/auth.js';
 import { registerJudgeHandlers } from './socket/judge.handler.js';
 import { registerContestHandlers } from './socket/contest.handler.js';
@@ -49,6 +50,7 @@ async function bootstrap() {
   await fastify.register(workspaceRoutes);
   await fastify.register(leaderboardRoutes);
   await fastify.register(adminRoutes);
+  await fastify.register(problemAdminRoutes);
   await fastify.register(authRoutes);
 
   // ── Socket.IO ──────────────────────────────────────────────────────────────

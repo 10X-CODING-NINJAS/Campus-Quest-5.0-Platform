@@ -212,6 +212,11 @@ export default function App() {
       fetchSubmissions();
     });
 
+    // Live-reload problem list when admin changes problems
+    activeSocket.on('problems:updated', () => {
+      fetchProblems();
+    });
+
     // Check security hook in Electron
     if ((window as any).electronAPI?.onSecurityViolation) {
       (window as any).electronAPI.onSecurityViolation((type: string) => {
@@ -242,6 +247,7 @@ export default function App() {
       activeSocket.off('team:paused', handleTeamPaused);
       activeSocket.off('team:resumed', handleTeamResumed);
       activeSocket.off('submit:result');
+      activeSocket.off('problems:updated');
     };
   }, [socketEpoch]);
 

@@ -17,6 +17,7 @@ export interface ProblemMeta {
   checkerType: 'default' | 'float' | 'unordered' | 'case-insensitive' | 'custom';
   starterCode?: Record<string, string>;
   order?: number;
+  enabled?: boolean;
 }
 
 export interface Testcase {

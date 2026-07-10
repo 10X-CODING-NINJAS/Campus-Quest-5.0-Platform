@@ -13,8 +13,9 @@ export default async function problemRoutes(fastify: FastifyInstance) {
       const problems = await discoverProblems();
 
       // Filter to only include active themed problems with an 'order' field, sorted
+      // Also exclude explicitly disabled problems (enabled defaults to true if absent)
       const filteredSorted = problems
-        .filter(p => typeof p.order === 'number')
+        .filter(p => typeof p.order === 'number' && p.enabled !== false)
         .sort((a, b) => (a.order || 0) - (b.order || 0));
 
       const safeProblems = filteredSorted.map(p => ({
