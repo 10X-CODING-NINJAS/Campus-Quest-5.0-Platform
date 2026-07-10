@@ -34,8 +34,6 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints'>('login');
   const [teamName, setTeamName] = useState('Team Earth-1610');
   const [questionNum, setQuestionNum] = useState(1);
-  const [selectedLang, setSelectedLang] = useState('cpp');
-  const [isSaved, setIsSaved] = useState(true);
   const [securityWarning, setSecurityWarning] = useState<string | null>(null);
   const [violationCount, setViolationCount] = useState(0);
   const [isAutoSubmitted, setIsAutoSubmitted] = useState(false);
@@ -400,16 +398,12 @@ export default function App() {
           {/* Code Editor, Test cases and Team Stats panel (Right Column) */}
           <RightPanel
             questionNum={questionNum}
-            selectedLang={selectedLang}
-            setSelectedLang={setSelectedLang}
-            isSaved={isSaved}
-            setIsSaved={setIsSaved}
             powerupCounts={powerupCounts}
             onUsePowerup={handleUsePowerup}
             onUseSpideySenseSuccess={() => setCurrentScreen('hints')}
             problem={problemDetail}
             loading={problemsLoading}
-            solvedCount={questionsSolved}
+            questionsSolved={questionsSolved}
             onSolveSuccess={fetchSubmissions}
           />
         </div>

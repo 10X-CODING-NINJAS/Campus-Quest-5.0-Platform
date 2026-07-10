@@ -14,6 +14,7 @@ import { db } from '../db/index.js';
 import { submissions } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { emitHintProgress, getHintUnlockMessage, syncHintProgressForTeam } from '../services/hint-progress.js';
+import { updateWorkspaceResult } from '../services/workspace.js';
 
 // ── Job types ─────────────────────────────────────────────────────────────────
 
@@ -130,6 +131,11 @@ export function startJudgeWorker(io?: WorkerIo) {
             io?.to(data.teamId).emit('hint:toast', { message: unlockMessage });
           }
         }
+        await updateWorkspaceResult(data.teamId, data.problemId, {
+          latestVerdict: result.verdict,
+          latestRuntimeMs: result.runtimeMs,
+          latestMemoryKb: result.memoryKb,
+        });
         return result;
       }
 

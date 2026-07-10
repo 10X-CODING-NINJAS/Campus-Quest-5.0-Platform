@@ -9,6 +9,9 @@ interface EditorPanelProps {
   setLanguage: (lang: "cpp" | "python" | "c" | "java") => void;
   code: string;
   onChangeCode: (code: string) => void;
+  onCursorChange?: (line: number, column: number) => void;
+  onScrollChange?: (scrollTop: number) => void;
+  onMountEditor?: (editor: any) => void;
   onRunCode: () => void;
   onSubmitCode: () => void;
   onUseSpideySense: () => void;
@@ -21,6 +24,9 @@ export default function EditorPanel({
   setLanguage,
   code,
   onChangeCode,
+  onCursorChange,
+  onScrollChange,
+  onMountEditor,
   onRunCode,
   onSubmitCode,
   onUseSpideySense,
@@ -89,6 +95,16 @@ export default function EditorPanel({
           language={language === "cpp" ? "cpp" : language === "python" ? "python" : language === "java" ? "java" : "c"}
           value={code}
           onChange={(v) => onChangeCode(v ?? "")}
+          onMount={(editor) => {
+            onMountEditor?.(editor);
+            editor.onDidChangeCursorPosition(() => {
+              const pos = editor.getPosition();
+              if (pos) onCursorChange?.(pos.lineNumber, pos.column);
+            });
+            editor.onDidScrollChange(() => {
+              onScrollChange?.(editor.getScrollTop());
+            });
+          }}
           theme="vs-dark"
           options={{
             fontSize: 12,
@@ -99,6 +115,10 @@ export default function EditorPanel({
             fontFamily: '"JetBrains Mono", "Fira Code", monospace',
             lineNumbersMinChars: 3,
             tabSize: 4,
+            smoothScrolling: true,
+            bracketPairColorization: { enabled: true },
+            formatOnType: true,
+            formatOnPaste: true,
           }}
         />
       </div>

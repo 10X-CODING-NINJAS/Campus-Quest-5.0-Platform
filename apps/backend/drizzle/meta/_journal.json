@@ -29,6 +29,13 @@
       "when": 1783699300000,
       "tag": "0003_hint_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783699400000,
+      "tag": "0004_team_workspaces",
+      "breakpoints": true
     }
   ]
 }

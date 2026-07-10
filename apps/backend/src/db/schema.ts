@@ -1,5 +1,5 @@
 import {
-  pgTable, pgEnum, text, integer, boolean, timestamp, json, pgView,
+  pgTable, pgEnum, text, integer, boolean, timestamp, json, pgView, uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { createId } from '@paralleldrive/cuid2';
@@ -109,6 +109,25 @@ export const teamPowerups = pgTable('team_powerups', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+export const teamWorkspaces = pgTable('team_workspaces', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  teamId: text('team_id').notNull().references(() => teams.id),
+  problemId: text('problem_id').notNull(),
+  sourceCode: text('source_code').notNull().default(''),
+  selectedLanguage: languageEnum('selected_language').notNull().default('cpp'),
+  cursorLine: integer('cursor_line').notNull().default(1),
+  cursorColumn: integer('cursor_column').notNull().default(1),
+  scrollTop: integer('scroll_top').notNull().default(0),
+  latestVerdict: verdictEnum('latest_verdict'),
+  latestRuntimeMs: integer('latest_runtime_ms'),
+  latestMemoryKb: integer('latest_memory_kb'),
+  lastSavedAt: timestamp('last_saved_at').notNull().defaultNow(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  teamProblemIdx: uniqueIndex('team_workspaces_team_problem_idx').on(table.teamId, table.problemId),
+}));
+
 // ---------- Relations ----------
 export const teamsRelations = relations(teams, ({ many }) => ({
   submissions: many(submissions),
@@ -126,6 +145,10 @@ export const violationsRelations = relations(violations, ({ one }) => ({
 
 export const teamPowerupsRelations = relations(teamPowerups, ({ one }) => ({
   team: one(teams, { fields: [teamPowerups.teamId], references: [teams.id] }),
+}));
+
+export const teamWorkspacesRelations = relations(teamWorkspaces, ({ one }) => ({
+  team: one(teams, { fields: [teamWorkspaces.teamId], references: [teams.id] }),
 }));
 
 // ---------- Leaderboard View ----------
