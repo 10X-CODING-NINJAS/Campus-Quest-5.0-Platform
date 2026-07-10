@@ -13,6 +13,7 @@ import { check } from '../judge/checker.js';
 import { db } from '../db/index.js';
 import { submissions } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { emitHintProgress, getHintUnlockMessage, syncHintProgressForTeam } from '../services/hint-progress.js';
 
 // ── Job types ─────────────────────────────────────────────────────────────────
 
@@ -89,7 +90,12 @@ function worstVerdict(a: Verdict, b: Verdict): Verdict {
 
 // ── Worker factory ────────────────────────────────────────────────────────────
 
-export function startJudgeWorker(io?: { to: (room: string) => { emit: (ev: string, data: unknown) => void }; emit: (ev: string, data: unknown) => void }) {
+type WorkerIo = {
+  to: (room: string) => { emit: (ev: string, data: unknown) => void };
+  emit: (ev: string, data: unknown) => void;
+};
+
+export function startJudgeWorker(io?: WorkerIo) {
   const concurrency = parseInt(process.env.JUDGE_CONCURRENCY ?? '4', 10);
 
   const worker = new Worker<JudgeJobData, RunJobResult | SubmitJobResult>(
@@ -115,6 +121,14 @@ export function startJudgeWorker(io?: { to: (room: string) => { emit: (ev: strin
           });
           // Broadcast leaderboard update to all
           io.emit('leaderboard:update', {});
+        }
+        if (result.verdict === 'AC') {
+          const snapshot = await syncHintProgressForTeam(data.teamId);
+          emitHintProgress(io, snapshot);
+          const unlockMessage = getHintUnlockMessage(snapshot.hintProgress);
+          if (unlockMessage) {
+            io?.to(data.teamId).emit('hint:toast', { message: unlockMessage });
+          }
         }
         return result;
       }

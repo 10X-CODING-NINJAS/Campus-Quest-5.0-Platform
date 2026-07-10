@@ -10,7 +10,9 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { Lock } from 'lucide-react';
 
 interface HintsPageProps {
-  solvedCount: number;
+  questionsSolved: number;
+  hintProgress: 0 | 1 | 2 | 3;
+  missionCompleted: boolean;
 }
 
 const RIDDLE_FRAGMENTS = [
@@ -20,11 +22,11 @@ const RIDDLE_FRAGMENTS = [
   "Fragment 4: ...and find the USB drive waiting for you!"
 ];
 
-export default function HintsPage({ solvedCount }: HintsPageProps) {
+export default function HintsPage({ questionsSolved, hintProgress, missionCompleted }: HintsPageProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
 
-  const isMapUnlocked = solvedCount >= 6;
+  const isMapUnlocked = hintProgress >= 2;
 
   useEffect(() => {
     if (!isMapUnlocked || !mapContainerRef.current) return;
@@ -216,10 +218,10 @@ export default function HintsPage({ solvedCount }: HintsPageProps) {
           <div className="w-full bg-zinc-900 h-6 border-3 border-black overflow-hidden relative shadow-[2px_2px_0px_rgba(0,0,0,1)]">
             <div 
               className="h-full bg-gradient-to-r from-red-600 to-[#ff3d71] transition-all duration-500 ease-out" 
-              style={{ width: `${(solvedCount / 6) * 100}%` }}
+              style={{ width: `${(Math.min(questionsSolved, 6) / 6) * 100}%` }}
             />
             <div className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-black text-white">
-              DECRYPTION POWER: {solvedCount} / 6 MODULES
+              DECRYPTION POWER: {questionsSolved} / 6 MODULES
             </div>
           </div>
         </div>
@@ -257,14 +259,14 @@ export default function HintsPage({ solvedCount }: HintsPageProps) {
           DECRYPTED RIDDLES
         </div>
         <div className="space-y-4">
-          {solvedCount < 7 ? (
+          {questionsSolved < 7 ? (
             <div className="text-zinc-500 font-mono text-[11px] italic py-4 text-center border border-dashed border-zinc-800">
               🔒 Solve Question 7 to begin decrypting the final CTF riddle.
             </div>
           ) : (
             <div className="space-y-3">
               {RIDDLE_FRAGMENTS.map((frag, idx) => {
-                const isUnlocked = solvedCount >= (7 + idx);
+                const isUnlocked = questionsSolved >= (7 + idx);
                 return (
                   <div 
                     key={idx} 
@@ -289,7 +291,7 @@ export default function HintsPage({ solvedCount }: HintsPageProps) {
             </div>
           )}
 
-          {solvedCount >= 10 && (
+          {missionCompleted && (
             <div className="bg-red-950/40 border-2 border-red-500/50 p-3 text-center rounded-none shadow-[2px_2px_0px_rgba(239,68,68,0.2)] animate-pulse">
               <div className="font-display font-black text-xs text-red-500 tracking-wider mb-1">FINAL OVERRIDE COMPLETED!</div>
               <p className="font-sans text-[10px] text-zinc-300 leading-snug">

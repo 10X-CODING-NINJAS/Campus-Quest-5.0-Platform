@@ -2,6 +2,7 @@ import { db } from '../db/index.js';
 import { teams, teamPowerups } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { getContestStateSnapshot } from '../services/contest-state.js';
+import { getHintProgressSnapshot } from '../services/hint-progress.js';
 
 export function registerContestHandlers(socket: any) {
   void getContestStateSnapshot()
@@ -16,6 +17,7 @@ export function registerContestHandlers(socket: any) {
     const teamId = socket.data?.teamId;
     let isPaused = false;
     let powerupCounts = { SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 };
+    let hintProgress = { teamId: teamId ?? '', questionsSolved: 0, hintProgress: 0 as 0 | 1 | 2 | 3, missionCompleted: false };
     
     if (teamId) {
       const teamData = await db.select().from(teams).where(eq(teams.id, teamId));
@@ -32,15 +34,19 @@ export function registerContestHandlers(socket: any) {
         WEB_FLUID: allUsages.filter(p => p.type === 'WEB_FLUID').length,
         SUIT_TECH: allUsages.filter(p => p.type === 'SUIT_TECH').length
       };
+
+      hintProgress = await getHintProgressSnapshot(teamId);
     }
     
     socket.emit('contest:sync_result', {
       contestStatus: contestState.state,
       contestState,
       isTeamPaused: isPaused,
-      powerupCounts
+      powerupCounts,
+      hintProgress,
     });
     socket.emit('contest:state', contestState);
+    socket.emit('hint:update', hintProgress);
   });
 
   // Automatically triggered when frontend detects security violation

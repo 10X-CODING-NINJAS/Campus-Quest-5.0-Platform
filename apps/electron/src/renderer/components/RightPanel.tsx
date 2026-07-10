@@ -279,7 +279,9 @@ export default function RightPanel({
         onSpiderSenseClick={() => setIsSpideyModalOpen(true)} 
         powerupCounts={powerupCounts}
         onUsePowerup={onUsePowerup}
-        solvedCount={solvedCount}
+        questionsSolved={solvedCount}
+        hintProgress={Math.min(Math.floor(solvedCount / 3), 3) as 0 | 1 | 2 | 3}
+        missionCompleted={solvedCount >= 10}
       />
 
       {/* Comic Book Alert Modal */}
