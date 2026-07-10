@@ -9,15 +9,13 @@ import GlitchText from './GlitchText';
 import TopBar from './TopBar';
 
 interface LobbyProps {
-  onProceed: () => void;
   teamName: string;
   onTeamNameChange: (name: string) => void;
 }
 
-export default function Lobby({ onProceed, teamName, onTeamNameChange }: LobbyProps) {
+export default function Lobby({ teamName, onTeamNameChange }: LobbyProps) {
   const [timeLeft, setTimeLeft] = useState(120); // 2 minutes countdown
   const [teamsConnected, setTeamsConnected] = useState(12);
-  const [isStarting, setIsStarting] = useState(false);
 
   // 1. Ticking Countdown Timer
   useEffect(() => {
@@ -30,14 +28,7 @@ export default function Lobby({ onProceed, teamName, onTeamNameChange }: LobbyPr
 
   // 2. Simulating Teams Connecting (Increments from 12 to 30)
   useEffect(() => {
-    if (teamsConnected >= 30) {
-      // Once all teams are connected, simulate admin starting the test
-      setIsStarting(true);
-      const startTimeout = setTimeout(() => {
-        onProceed();
-      }, 3000); // 3 seconds delay for dramatic effect
-      return () => clearTimeout(startTimeout);
-    }
+    if (teamsConnected >= 30) return;
 
     const delay = Math.random() * 2000 + 1000; // random interval between 1-3s
     const connectionTimer = setTimeout(() => {
@@ -45,7 +36,7 @@ export default function Lobby({ onProceed, teamName, onTeamNameChange }: LobbyPr
     }, delay);
 
     return () => clearTimeout(connectionTimer);
-  }, [teamsConnected, onProceed]);
+  }, [teamsConnected]);
 
   // Format time as MM:SS
   const formatTime = (seconds: number) => {
@@ -68,20 +59,9 @@ export default function Lobby({ onProceed, teamName, onTeamNameChange }: LobbyPr
         {/* Glow effect matching the orb theme */}
         <div className="absolute w-[200px] h-[200px] bg-red-600/10 rounded-full blur-2xl pointer-events-none -z-10 animate-pulse" />
 
-        {isStarting ? (
-          <div className="flex flex-col items-center gap-1">
-            <span className="font-comic text-yellow-400 text-3xl tracking-widest uppercase animate-bounce">
-              PREPARE!
-            </span>
-            <span className="font-sans text-xs text-zinc-300 tracking-wider uppercase font-bold">
-              ADMIN STARTING MISSION...
-            </span>
-          </div>
-        ) : (
-          <GlitchText className="font-digital text-red-500 text-5xl font-black tracking-widest drop-shadow-[0_0_12px_rgba(239,68,68,0.6)]">
-            {formatTime(timeLeft)}
-          </GlitchText>
-        )}
+        <GlitchText className="font-digital text-red-500 text-5xl font-black tracking-widest drop-shadow-[0_0_12px_rgba(239,68,68,0.6)]">
+          {formatTime(timeLeft)}
+        </GlitchText>
       </div>
 
       {/* Bottom Area: Teams connected text out of 30 */}

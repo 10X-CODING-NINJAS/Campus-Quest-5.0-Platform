@@ -13,9 +13,12 @@ datasource db {
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 enum ContestStatus {
-  PENDING
-  RUNNING
+  WAITING
+  DIAGNOSTICS
+  LOBBY
+  LIVE
   PAUSED
+  MISSION_MODE
   ENDED
 }
 
@@ -50,7 +53,7 @@ enum AntiCheatEventType {
 
 model ContestState {
   id                 String        @id @default(cuid())
-  status             ContestStatus @default(PENDING)
+  status             ContestStatus @default(WAITING)
   startedAt          DateTime?
   pausedAt           DateTime?
   endedAt            DateTime?

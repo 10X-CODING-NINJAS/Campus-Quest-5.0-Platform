@@ -4,7 +4,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 
 export async function usePowerup(teamId: string, powerupId: string, contestId: string) {
   const [contest] = await db.select().from(contests).where(eq(contests.id, contestId));
-  if (contest.status !== 'RUNNING') throw new Error('Contest is not running');
+  if (contest.status !== 'LIVE') throw new Error('Contest is not running');
 
   const [powerup] = await db.select().from(teamPowerups)
     .where(and(

@@ -1,32 +1,44 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
-import { teams, contests, submissions, violations } from '../db/schema.js';
+import { teams, submissions, violations } from '../db/schema.js';
 import { eq, desc } from 'drizzle-orm';
 import { verifyAdminAuth } from '../middleware/auth.js';
+import {
+  broadcastContestState,
+  CONTEST_STATES,
+  type ContestState,
+  getContestStateSnapshot,
+  setContestState,
+} from '../services/contest-state.js';
 
 export default async function adminRoutes(fastify: FastifyInstance) {
   // ── Contest lifecycle ────────────────────────────────────────────────────────
+
+  fastify.get('/admin/contest/state', async (_request, reply) => {
+    const snapshot = await getContestStateSnapshot();
+    return reply.send(snapshot);
+  });
+
+  fastify.post<{ Body: { state: ContestState } }>('/admin/contest/state', async (request, reply) => {
+    if (!await verifyAdminAuth(request, reply)) return;
+
+    const { state } = request.body ?? {};
+    if (!CONTEST_STATES.includes(state)) {
+      return reply.code(400).send({ error: `state must be one of: ${CONTEST_STATES.join(', ')}` });
+    }
+
+    const snapshot = await setContestState(state);
+    broadcastContestState((fastify as any).io, snapshot);
+
+    return reply.send({ success: true, message: `Contest state changed to ${state}`, contestState: snapshot });
+  });
 
   // POST /admin/contest/start
   fastify.post('/admin/contest/start', async (request, reply) => {
     if (!await verifyAdminAuth(request, reply)) return;
 
-    const allContests = await db.select().from(contests);
-    const now = new Date();
-
-    if (allContests.length === 0) {
-      await db.insert(contests).values({
-        status: 'RUNNING',
-        startedAt: now,
-      });
-    } else {
-      await db.update(contests)
-        .set({ status: 'RUNNING', startedAt: now })
-        .where(eq(contests.id, allContests[0]!.id));
-    }
-
-    const io = (fastify as any).io;
-    io?.emit('contest:started');
+    const snapshot = await setContestState('LIVE');
+    broadcastContestState((fastify as any).io, snapshot);
 
     return reply.send({ success: true, message: 'Contest started' });
   });
@@ -35,15 +47,8 @@ export default async function adminRoutes(fastify: FastifyInstance) {
   fastify.post('/admin/contest/pause', async (request, reply) => {
     if (!await verifyAdminAuth(request, reply)) return;
 
-    const [contest] = await db.select().from(contests);
-    if (!contest) return reply.code(404).send({ error: 'No contest found' });
-
-    await db.update(contests)
-      .set({ status: 'PAUSED', pausedAt: new Date() })
-      .where(eq(contests.id, contest.id));
-
-    const io = (fastify as any).io;
-    io?.emit('contest:paused');
+    const snapshot = await setContestState('PAUSED');
+    broadcastContestState((fastify as any).io, snapshot);
 
     return reply.send({ success: true, message: 'Contest paused' });
   });
@@ -52,15 +57,8 @@ export default async function adminRoutes(fastify: FastifyInstance) {
   fastify.post('/admin/contest/end', async (request, reply) => {
     if (!await verifyAdminAuth(request, reply)) return;
 
-    const [contest] = await db.select().from(contests);
-    if (!contest) return reply.code(404).send({ error: 'No contest found' });
-
-    await db.update(contests)
-      .set({ status: 'ENDED' })
-      .where(eq(contests.id, contest.id));
-
-    const io = (fastify as any).io;
-    io?.emit('contest:ended');
+    const snapshot = await setContestState('ENDED');
+    broadcastContestState((fastify as any).io, snapshot);
 
     return reply.send({ success: true, message: 'Contest ended' });
   });

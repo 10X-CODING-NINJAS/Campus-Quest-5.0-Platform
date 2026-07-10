@@ -7,9 +7,21 @@ import Diagnostics from './components/Diagnostics';
 import Lobby from './components/Lobby';
 import HintsPage from './components/HintsPage';
 import fullBg from '../Assets/Full bg.png';
-import { socket, reconnectSocket } from './lib/socket';
+import { getSocket, reconnectSocket } from './lib/socket';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3001';
+const CONTEST_STATES = ['WAITING', 'DIAGNOSTICS', 'LOBBY', 'LIVE', 'PAUSED', 'MISSION_MODE', 'ENDED'] as const;
+type ContestState = (typeof CONTEST_STATES)[number];
+
+interface ContestStateSnapshot {
+  state: ContestState;
+  previousState: ContestState | null;
+  updatedAt: string;
+  startedAt: string | null;
+  pausedAt: string | null;
+  endsAt: string | null;
+  durationMs: number;
+}
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints'>('login');
@@ -20,9 +32,11 @@ export default function App() {
   const [securityWarning, setSecurityWarning] = useState<string | null>(null);
   const [violationCount, setViolationCount] = useState(0);
   const [isAutoSubmitted, setIsAutoSubmitted] = useState(false);
-  const [contestStatus, setContestStatus] = useState<'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'ENDED'>('RUNNING');
+  const [contestState, setContestState] = useState<ContestState>('WAITING');
+  const [previousLiveScreen, setPreviousLiveScreen] = useState<'coding' | 'hints'>('coding');
   const [isTeamPaused, setIsTeamPaused] = useState(false);
   const [powerupCounts, setPowerupCounts] = useState({ SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 });
+  const [socketEpoch, setSocketEpoch] = useState(0);
 
   // 10-Problem list and detail states
   const [problems, setProblems] = useState<any[]>([]);
@@ -103,7 +117,7 @@ export default function App() {
       if (storedTeamName) setTeamName(storedTeamName);
       // Re-initialize socket
       reconnectSocket(token);
-      setCurrentScreen('coding');
+      setSocketEpoch((epoch) => epoch + 1);
       fetchProblems();
       fetchSubmissions();
     }
@@ -115,10 +129,28 @@ export default function App() {
     localStorage.setItem('team_name', team.name);
     setTeamName(team.name);
     reconnectSocket(token);
-    setCurrentScreen('diagnostics');
+    setSocketEpoch((epoch) => epoch + 1);
     fetchProblems();
     fetchSubmissions();
   };
+
+  useEffect(() => {
+    if (currentScreen === 'coding' || currentScreen === 'hints') {
+      setPreviousLiveScreen(currentScreen);
+    }
+  }, [currentScreen]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    if (!token || contestState === 'WAITING') {
+      setCurrentScreen('login');
+      return;
+    }
+
+    if (contestState === 'DIAGNOSTICS') setCurrentScreen('diagnostics');
+    else if (contestState === 'LOBBY') setCurrentScreen('lobby');
+    else if (contestState === 'LIVE' || contestState === 'PAUSED') setCurrentScreen(previousLiveScreen);
+  }, [contestState, previousLiveScreen]);
 
   // Fetch details whenever questionNum or problems list updates
   useEffect(() => {
@@ -132,24 +164,40 @@ export default function App() {
 
   // Hook up Socket.IO events for live status sync
   useEffect(() => {
-    const handleContestStarted = () => setContestStatus('RUNNING');
-    const handleContestPaused = () => setContestStatus('PAUSED');
-    const handleContestEnded = () => setContestStatus('ENDED');
+    const activeSocket = getSocket();
+    const requestSync = () => activeSocket.emit('contest:sync');
+    const handleContestState = (snapshot: ContestStateSnapshot) => {
+      if (snapshot?.state && CONTEST_STATES.includes(snapshot.state)) {
+        setContestState(snapshot.state);
+      }
+    };
+    const handleSyncResult = (payload: {
+      contestStatus?: ContestState;
+      contestState?: ContestStateSnapshot;
+      isTeamPaused?: boolean;
+      powerupCounts?: typeof powerupCounts;
+    }) => {
+      if (payload.contestState) handleContestState(payload.contestState);
+      else if (payload.contestStatus && CONTEST_STATES.includes(payload.contestStatus)) setContestState(payload.contestStatus);
+      if (typeof payload.isTeamPaused === 'boolean') setIsTeamPaused(payload.isTeamPaused);
+      if (payload.powerupCounts) setPowerupCounts(payload.powerupCounts);
+    };
     const handleTeamPaused = () => setIsTeamPaused(true);
     const handleTeamResumed = () => {
       setIsTeamPaused(false);
       setSecurityWarning(null);
     };
 
-    socket.on('contest:started', handleContestStarted);
-    socket.on('contest:paused', handleContestPaused);
-    socket.on('contest:ended', handleContestEnded);
-    socket.on('team:paused', handleTeamPaused);
-    socket.on('team:resumed', handleTeamResumed);
-    socket.on('powerup:updated', (counts: any) => setPowerupCounts(counts));
+    activeSocket.on('connect', requestSync);
+    activeSocket.on('contest:state', handleContestState);
+    activeSocket.on('contest:sync_result', handleSyncResult);
+    activeSocket.on('team:paused', handleTeamPaused);
+    activeSocket.on('team:resumed', handleTeamResumed);
+    activeSocket.on('powerup:updated', (counts: any) => setPowerupCounts(counts));
+    requestSync();
 
     // When a submit completes, refetch solved count dynamically
-    socket.on('submit:result', () => {
+    activeSocket.on('submit:result', () => {
       fetchSubmissions();
     });
 
@@ -162,7 +210,7 @@ export default function App() {
             setIsAutoSubmitted(true);
             setSecurityWarning(null);
           } else {
-            socket.emit('violation:trigger', { type });
+            activeSocket.emit('violation:trigger', { type });
             setIsTeamPaused(true);
             setSecurityWarning(
               type === 'blur'
@@ -176,17 +224,17 @@ export default function App() {
     }
 
     return () => {
-      socket.off('contest:started', handleContestStarted);
-      socket.off('contest:paused', handleContestPaused);
-      socket.off('contest:ended', handleContestEnded);
-      socket.off('team:paused', handleTeamPaused);
-      socket.off('team:resumed', handleTeamResumed);
-      socket.off('submit:result');
+      activeSocket.off('connect', requestSync);
+      activeSocket.off('contest:state', handleContestState);
+      activeSocket.off('contest:sync_result', handleSyncResult);
+      activeSocket.off('team:paused', handleTeamPaused);
+      activeSocket.off('team:resumed', handleTeamResumed);
+      activeSocket.off('submit:result');
     };
-  }, []);
+  }, [socketEpoch]);
 
   const handleUsePowerup = (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => {
-    socket.emit('powerup:use', { type });
+    getSocket().emit('powerup:use', { type });
     setPowerupCounts(prev => ({
       ...prev,
       [type]: prev[type] + 1
@@ -198,7 +246,7 @@ export default function App() {
   }
 
   if (currentScreen === 'diagnostics') {
-    return <Diagnostics onProceed={() => setCurrentScreen('lobby')} />;
+    return <Diagnostics />;
   }
 
   if (currentScreen === 'lobby') {
@@ -206,8 +254,36 @@ export default function App() {
       <Lobby
         teamName={teamName}
         onTeamNameChange={setTeamName}
-        onProceed={() => setCurrentScreen('coding')}
       />
+    );
+  }
+
+  if (contestState === 'MISSION_MODE') {
+    return (
+      <div className="h-screen w-screen bg-black text-white flex items-center justify-center p-8">
+        <div className="w-full max-w-xl border-4 border-red-600 bg-[#080810] p-8 shadow-[10px_10px_0px_0px_rgba(220,38,38,1)]">
+          <h1 className="text-4xl font-black font-mono uppercase tracking-widest text-red-500 mb-4">Mission Mode</h1>
+          <p className="text-zinc-300 mb-6">Submit the mission flag issued by the contest crew.</p>
+          <input
+            className="w-full bg-black border-2 border-zinc-700 px-4 py-3 font-mono text-lg outline-none focus:border-red-500"
+            placeholder="CQ5{...}"
+          />
+          <button className="mt-4 w-full bg-red-600 hover:bg-red-500 px-4 py-3 font-bold uppercase tracking-widest">
+            Submit Flag
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (contestState === 'ENDED') {
+    return (
+      <div className="h-screen w-screen bg-[#05050d] text-white flex items-center justify-center p-8">
+        <div className="max-w-2xl text-center">
+          <h1 className="text-6xl font-black font-mono uppercase tracking-tight text-emerald-400 mb-6">Contest Complete</h1>
+          <p className="text-xl text-zinc-300">Submissions are closed. Please wait for final results from the organizers.</p>
+        </div>
+      </div>
     );
   }
 
@@ -217,7 +293,7 @@ export default function App() {
       style={{ backgroundImage: `url(${fullBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
     >
       {/* Contest Not Started Overlay */}
-      {contestStatus === 'NOT_STARTED' && (
+      {contestState === 'WAITING' && (
         <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-md p-6">
           <div className="bg-[#080810] border-4 border-blue-500 rounded-xl p-10 max-w-2xl text-center shadow-[12px_12px_0px_0px_rgba(59,130,246,1)] comic-halftone">
             <h1 className="text-5xl font-bold text-blue-500 mb-6 font-mono tracking-tighter uppercase">WAITING FOR ADMIN</h1>
@@ -285,7 +361,7 @@ export default function App() {
 
       {/* Custom Header with controls & timer */}
       <TopBar
-        isPaused={isTeamPaused || contestStatus !== 'RUNNING'}
+        isPaused={isTeamPaused || contestState !== 'LIVE'}
         teamName={teamName}
         onTeamNameChange={setTeamName}
         currentScreen={currentScreen}
