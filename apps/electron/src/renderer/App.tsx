@@ -146,9 +146,7 @@ export default function App() {
       return;
     }
 
-    if (contestState === 'DIAGNOSTICS') setCurrentScreen('diagnostics');
-    else if (contestState === 'LOBBY') setCurrentScreen('lobby');
-    else setCurrentScreen(previousLiveScreen);
+    setCurrentScreen(previousLiveScreen);
   }, [contestState, previousLiveScreen]);
 
   // Fetch details whenever questionNum or problems list updates
