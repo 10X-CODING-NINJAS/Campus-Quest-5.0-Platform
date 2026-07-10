@@ -1,14 +1,16 @@
 import { db } from '../db/index.js';
-import { teams, contests, teamPowerups } from '../db/schema.js';
+import { teams, teamPowerups } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { getContestStateSnapshot } from '../services/contest-state.js';
 
 export function registerContestHandlers(socket: any) {
+  void getContestStateSnapshot()
+    .then((snapshot) => socket.emit('contest:state', snapshot))
+    .catch((error) => socket.emit('contest:error', { message: error.message }));
   
   // When a user connects, they can request their initial state
   socket.on('contest:sync', async () => {
-    // Get global contest status
-    const allContests = await db.select().from(contests);
-    const globalContest = allContests[0]; // Assuming singleton contest for now
+    const contestState = await getContestStateSnapshot();
     
     // Get team status
     const teamId = socket.data?.teamId;
@@ -33,10 +35,12 @@ export function registerContestHandlers(socket: any) {
     }
     
     socket.emit('contest:sync_result', {
-      contestStatus: globalContest?.status || 'NOT_STARTED',
+      contestStatus: contestState.state,
+      contestState,
       isTeamPaused: isPaused,
       powerupCounts
     });
+    socket.emit('contest:state', contestState);
   });
 
   // Automatically triggered when frontend detects security violation

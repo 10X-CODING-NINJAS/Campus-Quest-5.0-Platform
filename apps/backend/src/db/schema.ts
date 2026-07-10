@@ -18,7 +18,15 @@ export const verdictEnum = pgEnum('verdict', [
   'PE',   // Presentation Error
   'IJE',  // Internal Judge Error
 ]);
-export const contestStatusEnum = pgEnum('contest_status', ['NOT_STARTED', 'RUNNING', 'PAUSED', 'ENDED']);
+export const contestStatusEnum = pgEnum('contest_status', [
+  'WAITING',
+  'DIAGNOSTICS',
+  'LOBBY',
+  'LIVE',
+  'PAUSED',
+  'MISSION_MODE',
+  'ENDED',
+]);
 export const violationTypeEnum = pgEnum('violation_type', [
   'TAB_SWITCH', 'BLUR', 'FULLSCREEN_EXIT', 'DEVTOOLS_ATTEMPT', 'COPY_PASTE',
 ]);
@@ -44,7 +52,9 @@ export const teams = pgTable('teams', {
 // ---------- Contest (singleton row for active competition) ----------
 export const contests = pgTable('contests', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  status: contestStatusEnum('status').notNull().default('NOT_STARTED'),
+  status: contestStatusEnum('status').notNull().default('WAITING'),
+  previousStatus: contestStatusEnum('previous_status'),
+  stateUpdatedAt: timestamp('state_updated_at').notNull().defaultNow(),
   startedAt: timestamp('started_at'),
   pausedAt: timestamp('paused_at'),
   totalPausedMs: integer('total_paused_ms').notNull().default(0),

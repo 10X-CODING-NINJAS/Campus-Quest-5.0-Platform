@@ -4,7 +4,7 @@ import { eq, sql } from 'drizzle-orm';
 
 export async function startContest(contestId: string) {
   const [contest] = await db.update(contests)
-    .set({ status: 'RUNNING', startedAt: new Date() })
+    .set({ status: 'LIVE', startedAt: new Date() })
     .where(eq(contests.id, contestId))
     .returning();
   return contest;
@@ -26,7 +26,7 @@ export async function resumeContest(contestId: string) {
 
   const [contest] = await db.update(contests)
     .set({
-      status: 'RUNNING',
+      status: 'LIVE',
       pausedAt: null,
       totalPausedMs: sql`${contests.totalPausedMs} + ${pausedDurationMs}`,
     })
