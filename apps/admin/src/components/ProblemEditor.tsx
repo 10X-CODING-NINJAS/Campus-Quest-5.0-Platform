@@ -8,21 +8,7 @@ interface TestcaseItem {
   output: string;
 }
 
-interface ProblemDetail {
-  id: string;
-  title: string;
-  difficulty: string;
-  timeLimit: number;
-  memoryLimit: number;
-  supportedLanguages: string[];
-  checkerType: string;
-  order: number | null;
-  enabled: boolean;
-  statement: string;
-  starterCode?: Record<string, string>;
-  samples: TestcaseItem[];
-  hidden: TestcaseItem[];
-}
+
 
 interface ProblemEditorProps {
   problemId: string | null; // null = creating new
@@ -60,10 +46,11 @@ export default function ProblemEditor({
   const [starterCode, setStarterCode] = useState<Record<string, string>>({
     c: '', cpp: '', java: '', python: '',
   });
+  const [referenceSolution, setReferenceSolution] = useState<{ language: string; code: string } | null>(null);
   const [samples, setSamples] = useState<TestcaseItem[]>([]);
   const [hidden, setHidden] = useState<TestcaseItem[]>([]);
   const [activeLang, setActiveLang] = useState('c');
-  const [activeTab, setActiveTab] = useState<'meta' | 'statement' | 'starter' | 'testcases'>('meta');
+  const [activeTab, setActiveTab] = useState<'meta' | 'statement' | 'starter' | 'reference' | 'testcases'>('meta');
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -82,7 +69,7 @@ export default function ProblemEditor({
       try {
         const res = await fetch(`${apiUrl}/admin/problems/${problemId}`, { headers });
         if (!res.ok) throw new Error('Failed to load problem');
-        const data: ProblemDetail = await res.json();
+        const data: any = await res.json();
         setTitle(data.title);
         setDifficulty(data.difficulty);
         setTimeLimit(data.timeLimit);
@@ -95,6 +82,10 @@ export default function ProblemEditor({
           java: data.starterCode?.java ?? '',
           python: data.starterCode?.python ?? '',
         });
+        setReferenceSolution(data.referenceSolution ? {
+          language: data.referenceSolution.language,
+          code: data.referenceSolution.code
+        } : { language: 'cpp', code: '' });
         setSamples(data.samples);
         setHidden(data.hidden);
         setLoadedId(data.id);
@@ -113,7 +104,7 @@ export default function ProblemEditor({
     try {
       const res = await fetch(`${apiUrl}/admin/problems/${id}`, { headers });
       if (res.ok) {
-        const data: ProblemDetail = await res.json();
+        const data: any = await res.json();
         setSamples(data.samples);
         setHidden(data.hidden);
       }
@@ -145,11 +136,15 @@ export default function ProblemEditor({
         const data = await res.json();
         setLoadedId(data.id);
 
-        // Now update starter code
+        // Now update starter code & reference solution
         await fetch(`${apiUrl}/admin/problems/${data.id}`, {
           method: 'PUT',
           headers,
-          body: JSON.stringify({ checkerType, starterCode }),
+          body: JSON.stringify({
+            checkerType,
+            starterCode,
+            referenceSolution: referenceSolution?.code ? referenceSolution : undefined
+          }),
         });
 
         setSuccessMsg(`Problem "${title}" created! You can now add testcases.`);
@@ -169,6 +164,7 @@ export default function ProblemEditor({
             checkerType,
             statement,
             starterCode,
+            referenceSolution: referenceSolution?.code ? referenceSolution : undefined,
           }),
         });
         if (!res.ok) {
@@ -258,6 +254,7 @@ export default function ProblemEditor({
             { key: 'meta', label: 'Metadata' },
             { key: 'statement', label: 'Statement' },
             { key: 'starter', label: 'Starter Code' },
+            { key: 'reference', label: 'Reference Solution' },
             { key: 'testcases', label: 'Testcases' },
           ] as const).map((tab) => (
             <button
@@ -392,6 +389,43 @@ export default function ProblemEditor({
                 }
                 className="w-full h-[calc(100vh-380px)] min-h-[350px] font-mono text-sm border border-slate-300 rounded-lg px-4 py-3 bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none resize-none leading-relaxed"
                 placeholder={`// Starter code for ${LANG_TABS.find(l => l.key === activeLang)?.label}`}
+                spellCheck={false}
+              />
+            </div>
+          )}
+
+          {/* Reference Solution tab */}
+          {activeTab === 'reference' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Language</label>
+                  <select
+                    value={referenceSolution?.language || 'cpp'}
+                    onChange={(e) => setReferenceSolution(prev => ({
+                      language: e.target.value,
+                      code: prev?.code || ''
+                    }))}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  >
+                    <option value="c">C</option>
+                    <option value="cpp">C++</option>
+                    <option value="java">Java</option>
+                    <option value="python">Python</option>
+                  </select>
+                </div>
+                <div className="text-xs text-slate-400 mt-5">
+                  Every problem requires exactly one valid reference solution to execute validation/benchmarks.
+                </div>
+              </div>
+              <textarea
+                value={referenceSolution?.code || ''}
+                onChange={(e) => setReferenceSolution(prev => ({
+                  language: prev?.language || 'cpp',
+                  code: e.target.value
+                }))}
+                className="w-full h-[calc(100vh-380px)] min-h-[350px] font-mono text-sm border border-slate-300 rounded-lg px-4 py-3 bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none resize-none leading-relaxed"
+                placeholder="// Paste complete reference solution code here..."
                 spellCheck={false}
               />
             </div>

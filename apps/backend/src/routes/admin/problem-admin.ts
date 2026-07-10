@@ -8,7 +8,12 @@ import {
   loadProblemStatement,
   loadSampleTestcases,
   loadHiddenTestcases,
+  loadReferenceSolution,
 } from '../../judge/problem-loader.js';
+import { runFullValidation } from '../../validation/validator.js';
+import { runContestHealthCheck } from '../../validation/readiness.js';
+import { compile, runTestcase, prepareWorkDir } from '../../judge/runner.js';
+import { SupportedLanguage } from '../../judge/languages.js';
 
 const PROBLEMS_ROOT = process.env.PROBLEMS_DIR
   ? path.resolve(process.env.PROBLEMS_DIR)
@@ -110,6 +115,7 @@ export default async function problemAdminRoutes(fastify: FastifyInstance) {
       problems.map(async (p) => {
         const sampleCount = await countTestcases(path.join(PROBLEMS_ROOT, p.id, 'samples'));
         const hiddenCount = await countTestcases(path.join(PROBLEMS_ROOT, p.id, 'hidden'));
+        const refSol = await loadReferenceSolution(p.id);
         return {
           id: p.id,
           title: p.title,
@@ -122,9 +128,9 @@ export default async function problemAdminRoutes(fastify: FastifyInstance) {
           enabled: p.enabled !== false,
           sampleCount,
           hiddenCount,
-          // Placeholders for future phases
-          verificationStatus: 'not_verified' as const,
-          publishedStatus: 'draft' as const,
+          readyStatus: p.readyStatus ?? 'draft',
+          lastValidation: p.lastValidation ?? null,
+          hasReferenceSolution: !!refSol,
         };
       }),
     );
@@ -150,11 +156,15 @@ export default async function problemAdminRoutes(fastify: FastifyInstance) {
       const statement = await loadProblemStatement(id);
       const samples = await loadSampleTestcases(id);
       const hidden = await loadHiddenTestcases(id);
+      const refSol = await loadReferenceSolution(id);
 
       return reply.send({
         ...meta,
         enabled: meta.enabled !== false,
+        readyStatus: meta.readyStatus ?? 'draft',
+        lastValidation: meta.lastValidation ?? null,
         statement,
+        referenceSolution: refSol ? { language: refSol.language, code: refSol.code } : null,
         samples: samples.map((tc, i) => ({
           num: i + 1,
           type: 'sample' as const,
@@ -264,6 +274,7 @@ export default async function problemAdminRoutes(fastify: FastifyInstance) {
       supportedLanguages?: string[];
       statement?: string;
       starterCode?: Record<string, string>;
+      referenceSolution?: { language: string; code: string };
     };
   }>('/admin/problems/:id', async (request, reply) => {
     if (!await verifyAdminAuth(request, reply)) return;
@@ -291,11 +302,37 @@ export default async function problemAdminRoutes(fastify: FastifyInstance) {
     if (body.checkerType !== undefined) existing.checkerType = body.checkerType;
     if (body.supportedLanguages !== undefined) existing.supportedLanguages = body.supportedLanguages;
 
+    // Reset validation status if problem changes
+    existing.readyStatus = 'draft';
+
     await writeProblemJson(problemDir, existing);
 
     // Update statement if provided
     if (body.statement !== undefined) {
       await writeFile(path.join(problemDir, 'statement.md'), body.statement, 'utf-8');
+    }
+
+    // Update reference solution if provided
+    if (body.referenceSolution) {
+      const refDir = path.join(problemDir, 'reference');
+      await mkdir(refDir, { recursive: true });
+
+      // Clean existing reference files to prevent duplicate languages
+      const entries = await readdir(refDir).catch(() => [] as string[]);
+      for (const entry of entries) {
+        await rm(path.join(refDir, entry), { force: true });
+      }
+
+      const extMap: Record<string, string> = {
+        c: 'solution.c',
+        cpp: 'solution.cpp',
+        java: 'solution.java',
+        python: 'solution.py',
+      };
+      const filename = extMap[body.referenceSolution.language];
+      if (filename) {
+        await writeFile(path.join(refDir, filename), body.referenceSolution.code, 'utf-8');
+      }
     }
 
     // Update starter code if provided
@@ -635,5 +672,211 @@ export default async function problemAdminRoutes(fastify: FastifyInstance) {
       message: `Testcase moved from ${from} to ${to}`,
       newNum: nextNum,
     });
+  });
+
+  // ── POST /admin/problems/:id/validate ────────────────────────────────────
+  fastify.post<{ Params: { id: string } }>('/admin/problems/:id/validate', async (request, reply) => {
+    if (!await verifyAdminAuth(request, reply)) return;
+
+    const { id } = request.params;
+    const problemDir = path.join(PROBLEMS_ROOT, id);
+    if (!await dirExists(problemDir)) {
+      return reply.code(404).send({ error: `Problem "${id}" not found` });
+    }
+
+    // Read problem.json
+    const raw = await readFile(path.join(problemDir, 'problem.json'), 'utf-8');
+    const existing = JSON.parse(raw);
+
+    // Update state to validating
+    existing.readyStatus = 'validating';
+    await writeProblemJson(problemDir, existing);
+    broadcastProblemsUpdated(fastify);
+
+    const report = await runFullValidation(id);
+
+    // Save report & update final status
+    existing.readyStatus = report.status === 'passed' ? 'ready' : 'draft';
+    existing.lastValidation = {
+      timestamp: new Date().toISOString(),
+      status: report.status,
+      duration: report.duration,
+      checksPassed: report.checks.filter(c => c.status === 'passed').length,
+      checksFailed: report.checks.filter(c => c.status === 'failed').length,
+      benchmarks: report.benchmarks?.referenceSolution ? {
+        maxRuntimeMs: report.benchmarks.referenceSolution.maxRuntimeMs,
+        maxMemoryKb: report.benchmarks.referenceSolution.maxMemoryKb,
+        withinLimits: report.benchmarks.referenceSolution.withinLimits
+      } : undefined
+    };
+
+    await writeProblemJson(problemDir, existing);
+    broadcastProblemsUpdated(fastify);
+
+    return reply.send(report);
+  });
+
+  // ── POST /admin/problems/validate-all ────────────────────────────────────
+  fastify.post('/admin/problems/validate-all', async (request, reply) => {
+    if (!await verifyAdminAuth(request, reply)) return;
+
+    const problems = await discoverProblems();
+    const reports: any[] = [];
+
+    for (const p of problems) {
+      const report = await runFullValidation(p.id);
+      reports.push(report);
+
+      const problemDir = path.join(PROBLEMS_ROOT, p.id);
+      const raw = await readFile(path.join(problemDir, 'problem.json'), 'utf-8');
+      const existing = JSON.parse(raw);
+
+      existing.readyStatus = report.status === 'passed' ? 'ready' : 'draft';
+      existing.lastValidation = {
+        timestamp: new Date().toISOString(),
+        status: report.status,
+        duration: report.duration,
+        checksPassed: report.checks.filter(c => c.status === 'passed').length,
+        checksFailed: report.checks.filter(c => c.status === 'failed').length,
+        benchmarks: report.benchmarks?.referenceSolution ? {
+          maxRuntimeMs: report.benchmarks.referenceSolution.maxRuntimeMs,
+          maxMemoryKb: report.benchmarks.referenceSolution.maxMemoryKb,
+          withinLimits: report.benchmarks.referenceSolution.withinLimits
+        } : undefined
+      };
+      await writeProblemJson(problemDir, existing);
+    }
+
+    broadcastProblemsUpdated(fastify);
+    return reply.send({ success: true, reports });
+  });
+
+  // ── PUT /admin/problems/:id/ready-status ─────────────────────────────────
+  fastify.put<{
+    Params: { id: string };
+    Body: { status: 'draft' | 'ready' | 'published' };
+  }>('/admin/problems/:id/ready-status', async (request, reply) => {
+    if (!await verifyAdminAuth(request, reply)) return;
+
+    const { id } = request.params;
+    const { status } = request.body ?? {};
+
+    const problemDir = path.join(PROBLEMS_ROOT, id);
+    if (!await dirExists(problemDir)) {
+      return reply.code(404).send({ error: `Problem "${id}" not found` });
+    }
+
+    const raw = await readFile(path.join(problemDir, 'problem.json'), 'utf-8');
+    const existing = JSON.parse(raw);
+
+    if (status === 'published' && existing.readyStatus !== 'ready' && existing.readyStatus !== 'published') {
+      return reply.code(400).send({ error: 'Only problems in "ready" state can be Published.' });
+    }
+
+    existing.readyStatus = status;
+    await writeProblemJson(problemDir, existing);
+    broadcastProblemsUpdated(fastify);
+
+    return reply.send({ success: true, readyStatus: status });
+  });
+
+  // ── POST /admin/problems/:id/regenerate-outputs ──────────────────────────
+  fastify.post<{
+    Params: { id: string };
+    Body: { confirm?: boolean };
+  }>('/admin/problems/:id/regenerate-outputs', async (request, reply) => {
+    if (!await verifyAdminAuth(request, reply)) return;
+
+    const { id } = request.params;
+    const { confirm } = request.body ?? {};
+
+    if (!confirm) {
+      return reply.code(400).send({ error: 'Confirmation required in request body.' });
+    }
+
+    const problemDir = path.join(PROBLEMS_ROOT, id);
+    if (!await dirExists(problemDir)) {
+      return reply.code(404).send({ error: `Problem "${id}" not found` });
+    }
+
+    const refSol = await loadReferenceSolution(id);
+    if (!refSol) {
+      return reply.code(400).send({ error: 'Problem has no reference solution to execute.' });
+    }
+
+    const meta = await loadProblemMeta(id);
+    const timeLimit = meta.timeLimit || 2000;
+    const memoryLimit = meta.memoryLimit || 256;
+
+    let cleanup: (() => Promise<void>) | null = null;
+    let counts = { samples: 0, hidden: 0 };
+
+    try {
+      const { workDir, cleanup: cleanFn } = await prepareWorkDir(refSol.language as SupportedLanguage, refSol.code);
+      cleanup = cleanFn;
+
+      // Compile Reference Solution
+      const compileRes = await compile(refSol.language as SupportedLanguage, refSol.code, workDir);
+      if (!compileRes.success) {
+        throw new Error(`Reference solution failed to compile: ${compileRes.stderr}`);
+      }
+
+      // Helper to process a directory
+      const processDir = async (dirName: 'samples' | 'hidden') => {
+        const fullDirPath = path.join(problemDir, dirName);
+        let entries: string[] = [];
+        try {
+          entries = await readdir(fullDirPath);
+        } catch {
+          return;
+        }
+
+        const inFiles = entries.filter(f => f.endsWith('.in'));
+        for (const inFile of inFiles) {
+          const num = inFile.slice(0, -3);
+          const inPath = path.join(fullDirPath, inFile);
+          const outPath = path.join(fullDirPath, `${num}.out`);
+
+          const runRes = await runTestcase(
+            refSol.language as SupportedLanguage,
+            workDir,
+            { filePath: inPath },
+            timeLimit,
+            memoryLimit
+          );
+
+          if (runRes.verdict !== 'AC') {
+            throw new Error(`Reference solution crashed or timed out on testcase ${num} of ${dirName}: Verdict ${runRes.verdict}`);
+          }
+
+          await writeFile(outPath, runRes.stdout, 'utf-8');
+          if (dirName === 'samples') counts.samples++;
+          else counts.hidden++;
+        }
+      };
+
+      await processDir('samples');
+      await processDir('hidden');
+
+    } catch (err: any) {
+      return reply.code(500).send({ error: `Output regeneration failed: ${err.message}` });
+    } finally {
+      if (cleanup) await cleanup();
+    }
+
+    broadcastProblemsUpdated(fastify);
+
+    return reply.send({
+      success: true,
+      message: `Regenerated expected outputs using reference solution. Updated ${counts.samples} sample(s) and ${counts.hidden} hidden testcase(s).`
+    });
+  });
+
+  // ── POST /admin/contest/health-check ─────────────────────────────────────
+  fastify.post('/admin/contest/health-check', async (request, reply) => {
+    if (!await verifyAdminAuth(request, reply)) return;
+
+    const report = await runContestHealthCheck((fastify as any).io);
+    return reply.send(report);
   });
 }

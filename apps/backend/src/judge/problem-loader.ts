@@ -18,6 +18,19 @@ export interface ProblemMeta {
   starterCode?: Record<string, string>;
   order?: number;
   enabled?: boolean;
+  readyStatus?: 'draft' | 'validating' | 'ready' | 'published';
+  lastValidation?: {
+    timestamp: string;
+    status: 'passed' | 'failed' | 'warning';
+    duration: number;
+    checksPassed: number;
+    checksFailed: number;
+    benchmarks?: {
+      maxRuntimeMs: number;
+      maxMemoryKb: number;
+      withinLimits: boolean;
+    };
+  };
 }
 
 export interface Testcase {
@@ -161,3 +174,37 @@ export async function discoverProblems(): Promise<ProblemMeta[]> {
 
   return metas;
 }
+
+// ── Reference Solution loading ──────────────────────────────────────────────
+
+export async function loadReferenceSolution(id: string): Promise<{ language: string; code: string; path: string } | null> {
+  const refDir = path.join(PROBLEMS_ROOT, id, 'reference');
+  let entries: string[];
+  try {
+    entries = await readdir(refDir);
+  } catch {
+    return null;
+  }
+
+  const extMap: Record<string, string> = {
+    c: 'solution.c',
+    cpp: 'solution.cpp',
+    java: 'solution.java',
+    python: 'solution.py'
+  };
+
+  for (const [lang, filename] of Object.entries(extMap)) {
+    if (entries.includes(filename)) {
+      try {
+        const filePath = path.join(refDir, filename);
+        const code = await readFile(filePath, 'utf-8');
+        return { language: lang, code, path: filePath };
+      } catch {
+        // continue search
+      }
+    }
+  }
+
+  return null;
+}
+

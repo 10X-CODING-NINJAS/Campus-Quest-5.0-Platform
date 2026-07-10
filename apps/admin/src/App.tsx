@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import ProblemManager from './components/ProblemManager';
+import ProblemValidator from './components/ProblemValidator';
+import ContestHealthCheck from './components/ContestHealthCheck';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 const CONTEST_STATES = ['WAITING', 'DIAGNOSTICS', 'LOBBY', 'LIVE', 'PAUSED', 'MISSION_MODE', 'ENDED'] as const;
@@ -20,7 +22,7 @@ type TeamRow = {
   createdAt: string;
 };
 
-type ActiveTab = 'contest' | 'problems';
+type ActiveTab = 'contest' | 'problems' | 'validation' | 'health';
 
 export default function App() {
   const [status, setStatus] = useState<string>('Unknown');
@@ -106,6 +108,20 @@ export default function App() {
       label: 'Problem Manager',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      ),
+    },
+    {
+      key: 'validation',
+      label: 'Problem Validation',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      ),
+    },
+    {
+      key: 'health',
+      label: 'Contest Health',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.26-2.5 3.19-2.5 5.5s1 4.24 2.5 5.5"/><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       ),
     },
   ];
@@ -246,6 +262,16 @@ export default function App() {
         {/* Problem Manager Tab */}
         {activeTab === 'problems' && (
           <ProblemManager adminToken={adminToken} apiUrl={API_URL} />
+        )}
+
+        {/* Problem Validation Tab */}
+        {activeTab === 'validation' && (
+          <ProblemValidator adminToken={adminToken} apiUrl={API_URL} />
+        )}
+
+        {/* Contest Health Tab */}
+        {activeTab === 'health' && (
+          <ContestHealthCheck adminToken={adminToken} apiUrl={API_URL} />
         )}
         
       </div>

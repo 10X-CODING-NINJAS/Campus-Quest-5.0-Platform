@@ -12,8 +12,11 @@ interface ProblemRow {
   enabled: boolean;
   sampleCount: number;
   hiddenCount: number;
-  verificationStatus: string;
-  publishedStatus: string;
+  readyStatus: 'draft' | 'validating' | 'ready' | 'published';
+  lastValidation: {
+    status: 'passed' | 'failed' | 'warning';
+    timestamp: string;
+  } | null;
 }
 
 interface ProblemManagerProps {
@@ -294,17 +297,32 @@ export default function ProblemManager({ adminToken, apiUrl }: ProblemManagerPro
                       </div>
                     </td>
 
-                    {/* Verification status (placeholder) */}
+                    {/* Verification status */}
                     <td className="py-3 px-4 text-center">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
-                        Not Verified
-                      </span>
+                      {p.lastValidation ? (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+                          p.lastValidation.status === 'passed' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                          p.lastValidation.status === 'warning' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                          'bg-red-50 text-red-600 border-red-200'
+                        }`}>
+                          {p.lastValidation.status.toUpperCase()}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
+                          Unvalidated
+                        </span>
+                      )}
                     </td>
 
-                    {/* Published status (placeholder) */}
+                    {/* Published status (readyStatus) */}
                     <td className="py-3 px-4 text-center">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
-                        Draft
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium uppercase ${
+                        p.readyStatus === 'published' ? 'bg-purple-100 text-purple-700' :
+                        p.readyStatus === 'ready' ? 'bg-emerald-100 text-emerald-700' :
+                        p.readyStatus === 'validating' ? 'bg-blue-100 text-blue-700' :
+                        'bg-slate-100 text-slate-500'
+                      }`}>
+                        {p.readyStatus || 'draft'}
                       </span>
                     </td>
 
