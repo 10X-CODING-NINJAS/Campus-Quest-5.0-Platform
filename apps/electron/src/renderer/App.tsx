@@ -141,14 +141,14 @@ export default function App() {
 
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
-    if (!token || contestState === 'WAITING') {
+    if (!token) {
       setCurrentScreen('login');
       return;
     }
 
     if (contestState === 'DIAGNOSTICS') setCurrentScreen('diagnostics');
     else if (contestState === 'LOBBY') setCurrentScreen('lobby');
-    else if (contestState === 'LIVE' || contestState === 'PAUSED') setCurrentScreen(previousLiveScreen);
+    else setCurrentScreen(previousLiveScreen);
   }, [contestState, previousLiveScreen]);
 
   // Fetch details whenever questionNum or problems list updates
@@ -311,19 +311,7 @@ export default function App() {
       style={{ backgroundImage: `url(${fullBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
     >
       {/* Contest Not Started Overlay */}
-      {contestState === 'WAITING' && (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-md p-6">
-          <div className="bg-[#080810] border-4 border-blue-500 rounded-xl p-10 max-w-2xl text-center shadow-[12px_12px_0px_0px_rgba(59,130,246,1)] comic-halftone">
-            <h1 className="text-5xl font-bold text-blue-500 mb-6 font-mono tracking-tighter uppercase">WAITING FOR ADMIN</h1>
-            <p className="text-xl text-white font-bold mb-8">
-              The contest will begin shortly. Please stand by.
-            </p>
-            <div className="flex justify-center items-center mb-4">
-              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Team Paused Overlay (Security Lockout) */}
       {isTeamPaused && !isAutoSubmitted && (

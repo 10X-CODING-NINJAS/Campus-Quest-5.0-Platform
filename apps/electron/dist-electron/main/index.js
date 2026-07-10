@@ -41,15 +41,17 @@ function createWindow() {
   electron.ipcMain.on("window-close", () => {
     mainWindow.close();
   });
-  mainWindow.on("blur", () => {
-    console.warn("SECURITY VIOLATION: Window lost focus");
-    mainWindow.webContents.send("security-violation", "blur");
-  });
-  mainWindow.on("leave-full-screen", () => {
-    console.warn("SECURITY VIOLATION: Exited full screen");
-    mainWindow.webContents.send("security-violation", "leave-full-screen");
-    mainWindow.setKiosk(true);
-  });
+  if (!isDev) {
+    mainWindow.on("blur", () => {
+      console.warn("SECURITY VIOLATION: Window lost focus");
+      mainWindow.webContents.send("security-violation", "blur");
+    });
+    mainWindow.on("leave-full-screen", () => {
+      console.warn("SECURITY VIOLATION: Exited full screen");
+      mainWindow.webContents.send("security-violation", "leave-full-screen");
+      mainWindow.setKiosk(true);
+    });
+  }
 }
 electron.app.whenReady().then(() => {
   createWindow();
