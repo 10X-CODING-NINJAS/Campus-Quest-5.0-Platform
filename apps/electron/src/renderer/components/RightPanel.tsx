@@ -312,16 +312,16 @@ export default function RightPanel({
         onChangeCode={handleEditorChange}
         onCursorChange={(line, column) => setCursorPosition({ line, column })}
         onScrollChange={(top) => setScrollTop(top)}
-      onRunCode={handleRunCode}
-      onSubmitCode={handleSubmitCode}
-      onUseSpideySense={() => setIsSpideyModalOpen(true)}
-      submissionResult={submissionResult}
-      consoleLogs={consoleLogs}
-      onMountEditor={(editor) => {
-        editor.setPosition(cursorPosition);
-        editor.setScrollTop(scrollTop);
-      }}
-    />
+        onRunCode={handleRunCode}
+        onSubmitCode={handleSubmitCode}
+        onUseSpideySense={() => setIsSpideyModalOpen(true)}
+        submissionResult={submissionResult}
+        consoleLogs={consoleLogs}
+        onMountEditor={(editor) => {
+          editor.setPosition({ lineNumber: cursorPosition.line, column: cursorPosition.column });
+          editor.setScrollTop(scrollTop);
+        }}
+      />
 
       {/* Team Stats Panel Card */}
       <LeftSidebar 
