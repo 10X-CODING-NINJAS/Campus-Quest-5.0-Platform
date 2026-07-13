@@ -46,19 +46,19 @@ function createWindow() {
   });
 
   // Security Monitoring Features
-  if (!isDev) {
-    mainWindow.on('blur', () => {
-      console.warn('SECURITY VIOLATION: Window lost focus');
-      mainWindow.webContents.send('security-violation', 'blur');
-    });
+  mainWindow.on('blur', () => {
+    console.warn('SECURITY VIOLATION: Window lost focus');
+    mainWindow.webContents.send('security-violation', 'blur');
+  });
 
-    mainWindow.on('leave-full-screen', () => {
-      console.warn('SECURITY VIOLATION: Exited full screen');
-      mainWindow.webContents.send('security-violation', 'leave-full-screen');
-      // Force back to kiosk mode for assessment
+  mainWindow.on('leave-full-screen', () => {
+    console.warn('SECURITY VIOLATION: Exited full screen');
+    mainWindow.webContents.send('security-violation', 'leave-full-screen');
+    // Force back to kiosk mode for assessment
+    if (!isDev) {
       mainWindow.setKiosk(true);
-    });
-  }
+    }
+  });
 }
 
 app.whenReady().then(() => {

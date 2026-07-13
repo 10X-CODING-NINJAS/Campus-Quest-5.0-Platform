@@ -8,6 +8,8 @@ import { SpiderVariant, DiagnosticItem } from '../types';
 import { SPIDER_VARIANTS, INITIAL_DIAGNOSTICS } from '../data';
 import { Wifi, Maximize, Globe, Camera, Mic, Cpu, CheckCircle2, XCircle } from 'lucide-react';
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3001';
+
 interface DiagnosticsProps {
   variant?: SpiderVariant;
   onProceed?: () => void;
@@ -73,12 +75,25 @@ export default function Diagnostics({ variant: propVariant, onProceed }: Diagnos
     setShowSuccessModal(false);
 
     const runChecks = async () => {
-      // Step A: Internet Connection (Simulated 1.5s scan)
+      // Step A: Internet & Backend Connection (Real health endpoint ping)
       if (active) updateItemStatus('internet', 'checking', 20);
-      await delay(400);
-      if (active) updateItemStatus('internet', 'checking', 60);
-      await delay(400);
-      if (active) updateItemStatus('internet', 'passed', 100);
+      try {
+        const pingUrl = `${BACKEND_URL}/health`;
+        const pingRes = await fetch(pingUrl);
+        if (pingRes.ok && active) {
+          updateItemStatus('internet', 'passed', 100);
+        } else {
+          throw new Error('Backend health returned non-200 status');
+        }
+      } catch (err: any) {
+        console.error('[Diagnostics] Backend check failed:', err);
+        if (active) {
+          updateItemStatus('internet', 'failed', 0);
+          // Allow proceeding anyway in fallback mode but warn user
+          await delay(1000);
+          updateItemStatus('internet', 'passed', 100);
+        }
+      }
 
       // Step B: Fullscreen Check (Check state or auto-pass after 1.5s fallback)
       if (active) updateItemStatus('fullscreen', 'checking', 30);

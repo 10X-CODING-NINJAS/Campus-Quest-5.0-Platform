@@ -25,9 +25,34 @@ const HOST = process.env.HOST ?? '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET ?? 'campus-quest-dev-secret';
 const CORS_ORIGINS = (process.env.CORS_ORIGINS ?? 'http://localhost:5173').split(',');
 
+import { runStartupChecks } from './services/startup-checks.js';
+
 async function bootstrap() {
+  // ── Run Startup self checks first ──────────────────────────────────────────
+  await runStartupChecks();
+
   // ── Fastify ────────────────────────────────────────────────────────────────
   const fastify = Fastify({ logger: true });
+
+  // ── Global Error Handler (Mask raw logs from contestants) ──────────────────
+  fastify.setErrorHandler((error: any, request, reply) => {
+    fastify.log.error(error);
+    const isDev = process.env.NODE_ENV !== 'production';
+    const isAdminRoute = request.url.startsWith('/admin') || request.url.startsWith('/api/admin');
+
+    if (isAdminRoute || isDev) {
+      return reply.code(error.statusCode ?? 500).send({
+        error: error.message || 'An internal server error occurred',
+        statusCode: error.statusCode ?? 500,
+        stack: error.stack,
+      });
+    }
+
+    return reply.code(error.statusCode ?? 500).send({
+      error: error.statusCode && error.statusCode < 500 ? error.message : 'A system connection or validation error occurred.',
+      statusCode: error.statusCode ?? 500,
+    });
+  });
 
   await fastify.register(cors, {
     origin: CORS_ORIGINS,

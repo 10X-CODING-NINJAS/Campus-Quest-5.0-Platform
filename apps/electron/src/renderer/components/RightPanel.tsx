@@ -66,8 +66,9 @@ export default function RightPanel({
     const onSnapshot = (payload: { workspaces: any[] }) => {
       const found = payload.workspaces.find((item) => item.problemId === problem.id);
       if (found) {
-        setWorkspaceCode(found.sourceCode ?? '');
-        setWorkspaceLanguage(found.selectedLanguage ?? 'cpp');
+        const lang = found.selectedLanguage ?? 'cpp';
+        setWorkspaceCode(found.sourceCode || problem.starterCode?.[lang] || CXX_TEMPLATE);
+        setWorkspaceLanguage(lang);
         setCursorPosition({ line: found.cursorLine ?? 1, column: found.cursorColumn ?? 1 });
         setScrollTop(found.scrollTop ?? 0);
         setWorkspaceMeta({
@@ -77,10 +78,10 @@ export default function RightPanel({
           lastSavedAt: found.lastSavedAt,
         });
       } else {
-        const backendLangKey = 'cpp';
-        const starter = problem.starterCode?.[backendLangKey];
+        const lang = 'cpp';
+        const starter = problem.starterCode?.[lang];
         setWorkspaceCode(starter || CXX_TEMPLATE);
-        setWorkspaceLanguage('cpp');
+        setWorkspaceLanguage(lang);
         setCursorPosition({ line: 1, column: 1 });
         setScrollTop(0);
         setWorkspaceMeta({});
@@ -103,6 +104,19 @@ export default function RightPanel({
       socket.off('workspace:saved', onSaved);
     };
   }, [problem?.id]);
+
+  const handleLanguageChange = (lang: 'cpp' | 'python' | 'c' | 'java') => {
+    setWorkspaceLanguage(lang);
+    const currentCodeTrimmed = workspaceCode.trim();
+    const isDefaultOrEmpty =
+      !currentCodeTrimmed ||
+      currentCodeTrimmed === CXX_TEMPLATE.trim() ||
+      Object.values(problem?.starterCode || {}).some(code => typeof code === 'string' && currentCodeTrimmed === code.trim());
+
+    if (isDefaultOrEmpty && problem?.starterCode?.[lang]) {
+      setWorkspaceCode(problem.starterCode[lang]);
+    }
+  };
 
   useEffect(() => {
     if (!workspaceLoaded || !problem?.id) return;
@@ -307,7 +321,7 @@ export default function RightPanel({
       <EditorPanel
         activeChallenge={activeChallenge}
         language={mappedLang}
-        setLanguage={(lang) => setWorkspaceLanguage(lang)}
+        setLanguage={handleLanguageChange}
         code={currentCode}
         onChangeCode={handleEditorChange}
         onCursorChange={(line, column) => setCursorPosition({ line, column })}
@@ -317,10 +331,9 @@ export default function RightPanel({
         onUseSpideySense={() => setIsSpideyModalOpen(true)}
         submissionResult={submissionResult}
         consoleLogs={consoleLogs}
-        onMountEditor={(editor) => {
-          editor.setPosition({ lineNumber: cursorPosition.line, column: cursorPosition.column });
-          editor.setScrollTop(scrollTop);
-        }}
+        cursorLine={cursorPosition.line}
+        cursorColumn={cursorPosition.column}
+        scrollTop={scrollTop}
       />
 
       {/* Team Stats Panel Card */}

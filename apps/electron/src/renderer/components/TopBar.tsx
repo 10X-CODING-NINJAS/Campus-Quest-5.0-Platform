@@ -11,6 +11,7 @@ interface TopBarProps {
   onTeamNameChange?: (name: string) => void;
   currentScreen?: 'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints';
   onNavigate?: (screen: 'coding' | 'hints') => void;
+  onLogout?: () => void;
 }
 
 export default function TopBar({
@@ -21,7 +22,8 @@ export default function TopBar({
   teamName = 'Team Earth-1610',
   onTeamNameChange,
   currentScreen = 'coding',
-  onNavigate
+  onNavigate,
+  onLogout
 }: TopBarProps) {
   const [seconds, setSeconds] = useState(77 * 60 + 42);
   const [colonVisible, setColonVisible] = useState(true);
@@ -144,6 +146,15 @@ export default function TopBar({
           <div className="text-gray-400 text-[10px] font-mono italic whitespace-nowrap">- We do this together.</div>
         </div>
       </div>
+
+      {onLogout && (
+        <button
+          onClick={onLogout}
+          className="mr-3 px-2 py-1 bg-zinc-800 hover:bg-red-700 text-white font-mono text-[9px] font-bold rounded border border-black shadow-[1px_1px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-none transition-all uppercase whitespace-nowrap"
+        >
+          LOG OUT
+        </button>
+      )}
 
       {/* Mission Control Title */}
       <div className="flex-1 flex justify-center">

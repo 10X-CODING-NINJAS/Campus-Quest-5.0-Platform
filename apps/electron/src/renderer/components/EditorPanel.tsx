@@ -11,7 +11,9 @@ interface EditorPanelProps {
   onChangeCode: (code: string) => void;
   onCursorChange?: (line: number, column: number) => void;
   onScrollChange?: (scrollTop: number) => void;
-  onMountEditor?: (editor: any) => void;
+  cursorLine: number;
+  cursorColumn: number;
+  scrollTop: number;
   onRunCode: () => void;
   onSubmitCode: () => void;
   onUseSpideySense: () => void;
@@ -26,7 +28,9 @@ export default function EditorPanel({
   onChangeCode,
   onCursorChange,
   onScrollChange,
-  onMountEditor,
+  cursorLine,
+  cursorColumn,
+  scrollTop,
   onRunCode,
   onSubmitCode,
   onUseSpideySense,
@@ -96,7 +100,32 @@ export default function EditorPanel({
           value={code}
           onChange={(v) => onChangeCode(v ?? "")}
           onMount={(editor) => {
-            onMountEditor?.(editor);
+            try {
+              if (editor) {
+                const model = editor.getModel();
+                if (model) {
+                  const maxLines = model.getLineCount() || 1;
+                  let targetLine = cursorLine ?? 1;
+                  let targetCol = cursorColumn ?? 1;
+
+                  if (targetLine < 1) targetLine = 1;
+                  if (targetLine > maxLines) targetLine = maxLines;
+
+                  const lineMaxCol = model.getLineMaxColumn(targetLine) || 1;
+                  if (targetCol < 1) targetCol = 1;
+                  if (targetCol > lineMaxCol) targetCol = lineMaxCol;
+
+                  editor.setPosition({ lineNumber: targetLine, column: targetCol });
+                }
+                
+                if (typeof scrollTop === "number" && scrollTop >= 0) {
+                  editor.setScrollTop(scrollTop);
+                }
+              }
+            } catch (err) {
+              console.warn("[Monaco Safe State] Failed to safely restore state:", err);
+            }
+
             editor.onDidChangeCursorPosition(() => {
               const pos = editor.getPosition();
               if (pos) onCursorChange?.(pos.lineNumber, pos.column);

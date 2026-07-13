@@ -45,6 +45,16 @@ export default function App() {
   const [hintProgress, setHintProgress] = useState<0 | 1 | 2 | 3>(0);
   const [missionCompleted, setMissionCompleted] = useState(false);
   const [socketEpoch, setSocketEpoch] = useState(0);
+  const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    const unsub = onConnectionChange((online) => {
+      setIsOffline(!online);
+    });
+    return () => {
+      unsub();
+    };
+  }, []);
 
   // 10-Problem list and detail states
   const [problems, setProblems] = useState<any[]>([]);
@@ -133,6 +143,15 @@ export default function App() {
     fetchSubmissions();
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('team_name');
+    setTeamName('');
+    setCurrentScreen('login');
+    const socket = getSocket();
+    socket.disconnect();
+  };
+
   useEffect(() => {
     if (currentScreen === 'coding' || currentScreen === 'hints') {
       setPreviousLiveScreen(currentScreen);
@@ -218,6 +237,15 @@ export default function App() {
     // Check security hook in Electron
     if ((window as any).electronAPI?.onSecurityViolation) {
       (window as any).electronAPI.onSecurityViolation((type: string) => {
+        const isDev = import.meta.env.DEV;
+        console.warn(`[Security] Violation detected: ${type} (DevMode: ${isDev})`);
+        
+        if (isDev) {
+          // Log only in dev mode
+          activeSocket.emit('violation:trigger', { type, isDev: true });
+          return;
+        }
+
         setViolationCount((prev) => {
           const newCount = prev + 1;
           if (newCount >= 5) {
@@ -256,6 +284,24 @@ export default function App() {
       [type]: prev[type] + 1
     }));
   };
+
+  if (isOffline) {
+    return (
+      <div className="h-screen w-screen bg-[#05050d] text-white flex items-center justify-center p-8 relative">
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-6">
+          <div className="bg-[#080810] border-4 border-red-500 rounded-xl p-10 max-w-2xl text-center shadow-[12px_12px_0px_0px_rgba(239,68,68,1)] comic-halftone">
+            <h1 className="text-5xl font-bold text-red-500 mb-6 font-mono tracking-tighter uppercase animate-pulse">CONNECTION LOST</h1>
+            <p className="text-xl text-white font-bold mb-8">
+              Attempting to reconnect to the trans-dimensional server...
+            </p>
+            <div className="flex justify-center items-center mb-4">
+              <div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (currentScreen === 'login') {
     return <LoginPage onLogin={handleLoginSuccess} />;
@@ -308,7 +354,6 @@ export default function App() {
       className="flex flex-col h-screen w-screen bg-[#080810] overflow-hidden text-white select-none relative"
       style={{ backgroundImage: `url(${fullBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
     >
-      {/* Contest Not Started Overlay */}
 
 
       {/* Team Paused Overlay (Security Lockout) */}
@@ -370,6 +415,7 @@ export default function App() {
         onTeamNameChange={setTeamName}
         currentScreen={currentScreen}
         onNavigate={(screen) => setCurrentScreen(screen)}
+        onLogout={handleLogout}
       />
 
       {/* Main Workspace Layout */}
