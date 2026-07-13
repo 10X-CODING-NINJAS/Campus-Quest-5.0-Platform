@@ -285,7 +285,7 @@ export default function App() {
     }));
   };
 
-  if (isOffline) {
+  if (isOffline && currentScreen !== 'login') {
     return (
       <div className="h-screen w-screen bg-[#05050d] text-white flex items-center justify-center p-8 relative">
         <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-6">
