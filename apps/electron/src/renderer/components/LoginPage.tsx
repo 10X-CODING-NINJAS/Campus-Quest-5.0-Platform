@@ -15,6 +15,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[Login] Submitting credentials...', { teamName, password });
     if (!teamName.trim() || !password.trim()) {
       setError('ALL FIELDS REQUIRED, HERO!');
       return;
@@ -23,19 +24,23 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     setLoading(true);
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
+      const url = `${BACKEND_URL}/api/auth/login`;
+      console.log('[Login] Sending request to:', url);
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: teamName, password }),
       });
 
       const data = await res.json();
+      console.log('[Login] Response data:', data);
       if (!res.ok) {
         throw new Error(data.error || 'TRANS-DIMENSIONAL CONNECTION FAILURE!');
       }
 
       onLogin(data.token, data.team);
     } catch (err: any) {
+      console.error('[Login] Error caught:', err);
       setError(err.message || 'FAILED TO ESTABLISH COM-LINK!');
     } finally {
       setLoading(false);
@@ -48,7 +53,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       <div className="absolute inset-0 comic-halftone opacity-30 pointer-events-none z-0" />
 
       {/* Aspect-ratio locked container to map coordinates perfectly to the image */}
-      <div
+      <form
+        onSubmit={handleSubmit}
         className="relative w-full h-full max-w-[1448px] max-h-[1086px] aspect-[1448/1086] bg-contain bg-center bg-no-repeat flex items-center justify-center z-10"
         style={{ backgroundImage: `url(${loginBg})` }}
       >
@@ -97,8 +103,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
         {/* Circular Login Button - aligned exactly over the background's red "LOGIN" circle */}
         <button
-          onClick={handleSubmit}
-          type="button"
+          type="submit"
           disabled={loading}
           className="absolute left-[49.7%] top-[77.4%] -translate-x-1/2 -translate-y-1/2 w-[10.5%] aspect-square rounded-full cursor-pointer z-20 outline-none group bg-transparent disabled:cursor-wait disabled:opacity-70"
           title={loading ? 'TRANSMITTING CREDENTIALS' : 'TRANSMIT CREDENTIALS'}
@@ -107,7 +112,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           <div className="absolute inset-0 rounded-full bg-transparent group-hover:bg-red-600/10 group-hover:scale-105 group-active:scale-95 group-hover:shadow-[0_0_25px_rgba(239,68,68,0.7)] border-4 border-transparent group-hover:border-red-500/40 transition-all duration-200" />
         </button>
 
-      </div>
+      </form>
     </div>
   );
 }
