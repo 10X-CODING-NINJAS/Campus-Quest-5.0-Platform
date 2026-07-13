@@ -141,6 +141,7 @@ export default function App() {
     setSocketEpoch((epoch) => epoch + 1);
     fetchProblems();
     fetchSubmissions();
+    setCurrentScreen('coding');
   };
 
   const handleLogout = () => {
