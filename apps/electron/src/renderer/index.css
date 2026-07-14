@@ -260,6 +260,23 @@ header .flex-shrink-0 {
   background-size: 6px 6px;
 }
 
+/* Custom Scrollbar for light comic panels */
+.comic-scroll::-webkit-scrollbar {
+  width: 12px;
+}
+.comic-scroll::-webkit-scrollbar-track {
+  background: #fdf6e2;
+  border-left: 2px solid #000;
+}
+.comic-scroll::-webkit-scrollbar-thumb {
+  background: #fde047;
+  border: 2px solid #000;
+  border-right: none;
+}
+.comic-scroll::-webkit-scrollbar-thumb:hover {
+  background: #eab308;
+}
+
 .comic-title {
   font-family: 'Bangers', sans-serif;
   letter-spacing: 0.05em;

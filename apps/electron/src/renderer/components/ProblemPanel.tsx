@@ -44,7 +44,7 @@ export default function ProblemPanel({ questionNum, setQuestionNum, problem, loa
       </div>
 
       {/* Description & Content Scrollbox */}
-      <div className="bg-[#fdf6e2] border-4 border-black p-5 shadow-[5px_5px_0px_#000] rounded-none flex-1 overflow-y-auto mb-2 flex flex-col gap-4 max-h-[700px]">
+      <div className="bg-[#fdf6e2] border-4 border-black p-5 shadow-[5px_5px_0px_#000] rounded-none flex-1 overflow-y-auto comic-scroll mb-2 flex flex-col gap-4 max-h-[700px]">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 py-20">
             <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>

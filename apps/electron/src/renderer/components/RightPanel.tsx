@@ -9,7 +9,12 @@ import { getSocket } from '../lib/socket';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3001';
 
-const CXX_TEMPLATE = `#include <iostream>\n#include <vector>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    \n    // Write your C++17 code here\n    \n    return 0;\n}\n`;
+const DEFAULT_TEMPLATES = {
+  cpp: `#include <iostream>\n#include <vector>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    \n    // Write your C++17 code here\n    \n    return 0;\n}\n`,
+  c: `#include <stdio.h>\n\nint main() {\n    // Write your C17 code here\n    \n    return 0;\n}\n`,
+  python: `# Write your Python 3 code here\n`,
+  java: `import java.util.*;\nimport java.io.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        // Write your Java 21 code here\n        \n    }\n}\n`
+};
 
 interface RightPanelProps {
   questionNum: number;
@@ -33,6 +38,7 @@ export default function RightPanel({
 }: RightPanelProps) {
   const [workspaceCode, setWorkspaceCode] = useState('');
   const [workspaceLanguage, setWorkspaceLanguage] = useState<'cpp' | 'python' | 'c' | 'java'>('cpp');
+  const [codeCache, setCodeCache] = useState<Record<string, string>>({});
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [scrollTop, setScrollTop] = useState(0);
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
@@ -68,6 +74,7 @@ export default function RightPanel({
       if (found) {
         setWorkspaceCode(found.sourceCode ?? '');
         setWorkspaceLanguage(found.selectedLanguage ?? 'cpp');
+        setCodeCache(prev => ({ ...prev, [found.selectedLanguage ?? 'cpp']: found.sourceCode ?? '' }));
         setCursorPosition({ line: found.cursorLine ?? 1, column: found.cursorColumn ?? 1 });
         setScrollTop(found.scrollTop ?? 0);
         setWorkspaceMeta({
@@ -79,7 +86,7 @@ export default function RightPanel({
       } else {
         const backendLangKey = 'cpp';
         const starter = problem.starterCode?.[backendLangKey];
-        setWorkspaceCode(starter || CXX_TEMPLATE);
+        setWorkspaceCode(starter || DEFAULT_TEMPLATES.cpp);
         setWorkspaceLanguage('cpp');
         setCursorPosition({ line: 1, column: 1 });
         setScrollTop(0);
@@ -134,6 +141,19 @@ export default function RightPanel({
   // Handle Monaco changes with immediate state saving (Autosave!)
   const handleEditorChange = (value: string) => {
     setWorkspaceCode(value);
+  };
+
+  const handleLanguageChange = (newLang: 'cpp' | 'python' | 'c' | 'java') => {
+    if (newLang === workspaceLanguage) return;
+    setCodeCache(prev => ({ ...prev, [workspaceLanguage]: workspaceCode }));
+    setWorkspaceLanguage(newLang);
+    
+    if (codeCache[newLang]) {
+      setWorkspaceCode(codeCache[newLang]);
+    } else {
+      const starter = problem?.starterCode?.[newLang];
+      setWorkspaceCode(starter || DEFAULT_TEMPLATES[newLang]);
+    }
   };
 
   const currentCode = workspaceCode || '';
@@ -307,7 +327,7 @@ export default function RightPanel({
       <EditorPanel
         activeChallenge={activeChallenge}
         language={mappedLang}
-        setLanguage={(lang) => setWorkspaceLanguage(lang)}
+        setLanguage={handleLanguageChange}
         code={currentCode}
         onChangeCode={handleEditorChange}
         onCursorChange={(line, column) => setCursorPosition({ line, column })}
@@ -318,8 +338,10 @@ export default function RightPanel({
       submissionResult={submissionResult}
       consoleLogs={consoleLogs}
       onMountEditor={(editor) => {
-        editor.setPosition(cursorPosition);
-        editor.setScrollTop(scrollTop);
+        if (editor && typeof editor.setPosition === 'function') {
+          editor.setPosition({ lineNumber: cursorPosition.line, column: cursorPosition.column });
+          editor.setScrollTop(scrollTop);
+        }
       }}
     />
 

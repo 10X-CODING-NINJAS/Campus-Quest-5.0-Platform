@@ -19,12 +19,22 @@ type TeamRow = {
   createdAt: string;
 };
 
+export interface LeaderboardEntry {
+  teamId: string;
+  teamName: string;
+  solved: number;
+  penalty: number;
+  bestRuntime: number;
+  rank: number;
+}
+
 export default function App() {
   const [status, setStatus] = useState<string>('Unknown');
   const [error, setError] = useState<string | null>(null);
   const [adminToken, setAdminToken] = useState('change-me-in-production');
   const [contestState, setContestState] = useState<ContestState>('WAITING');
   const [teams, setTeams] = useState<TeamRow[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 
   useEffect(() => {
     const s = io(API_URL, { transports: ['websocket', 'polling'] });
@@ -39,8 +49,16 @@ export default function App() {
         setTeams(res.data);
       } catch {}
     };
+    const refreshLeaderboard = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/leaderboard`);
+        setLeaderboard(res.data);
+      } catch {}
+    };
     s.on('hint:update', refreshTeams);
-    s.on('connect', refreshTeams);
+    s.on('leaderboard:update', refreshLeaderboard);
+    s.on('connect', () => { refreshTeams(); refreshLeaderboard(); });
+    refreshLeaderboard();
 
     axios.get(`${API_URL}/admin/contest/state`)
       .then((res) => {
@@ -54,6 +72,7 @@ export default function App() {
     return () => {
       s.off('contest:state');
       s.off('hint:update');
+      s.off('leaderboard:update');
       s.off('connect');
       s.disconnect();
     };
@@ -188,6 +207,40 @@ export default function App() {
                     <td className="py-3 text-slate-700">{team.hintProgress} / 3</td>
                     <td className="py-3 text-slate-700">{team.missionCompleted ? 'Completed' : 'In Progress'}</td>
                     <td className="py-3 text-slate-700">{contestState}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mt-8">
+          <h2 className="text-xl font-semibold mb-4 text-slate-800 flex items-center gap-2">
+            🏆 Live Leaderboard
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-slate-500 uppercase text-xs border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-2">Rank</th>
+                  <th className="py-3">Team Name</th>
+                  <th className="py-3">Solved</th>
+                  <th className="py-3">Penalty (mins)</th>
+                  <th className="py-3">Fastest Runtime</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leaderboard.length === 0 ? (
+                  <tr><td colSpan={5} className="py-4 text-center text-slate-500">No data available</td></tr>
+                ) : leaderboard.map((entry) => (
+                  <tr key={entry.teamId} className={`border-b border-slate-100 ${entry.rank === 1 ? 'bg-yellow-50/50' : entry.rank === 2 ? 'bg-slate-50/50' : entry.rank === 3 ? 'bg-orange-50/50' : ''}`}>
+                    <td className="py-3 px-2">
+                      {entry.rank === 1 ? '🥇 1' : entry.rank === 2 ? '🥈 2' : entry.rank === 3 ? '🥉 3' : entry.rank}
+                    </td>
+                    <td className="py-3 font-medium text-slate-800">{entry.teamName}</td>
+                    <td className="py-3 text-emerald-600 font-bold">{entry.solved}</td>
+                    <td className="py-3 text-red-500">{entry.penalty}</td>
+                    <td className="py-3 text-slate-500">{entry.bestRuntime > 0 ? `${entry.bestRuntime}ms` : '-'}</td>
                   </tr>
                 ))}
               </tbody>

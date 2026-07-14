@@ -3,7 +3,7 @@ import path from 'path';
 
 // Root directory where all problems live.
 // In production this is an absolute path outside source; during dev it's relative to CWD.
-const PROBLEMS_ROOT = process.env.PROBLEMS_DIR
+const getProblemsRoot = () => process.env.PROBLEMS_DIR
   ? path.resolve(process.env.PROBLEMS_DIR)
   : path.resolve(process.cwd(), 'problems');
 
@@ -29,7 +29,7 @@ export interface Testcase {
 // ── Problem metadata ────────────────────────────────────────────────────────
 
 export async function loadProblemMeta(id: string): Promise<ProblemMeta> {
-  const jsonPath = path.join(PROBLEMS_ROOT, id, 'problem.json');
+  const jsonPath = path.join(getProblemsRoot(), id, 'problem.json');
   const raw = await readFile(jsonPath, 'utf-8');
   const parsed = JSON.parse(raw) as ProblemMeta;
 
@@ -42,7 +42,7 @@ export async function loadProblemMeta(id: string): Promise<ProblemMeta> {
     python: 'python.py',
   };
 
-  const starterDir = path.join(PROBLEMS_ROOT, id, 'starter');
+  const starterDir = path.join(getProblemsRoot(), id, 'starter');
   for (const lang of langs) {
     try {
       const fileContent = await readFile(path.join(starterDir, extMap[lang]), 'utf-8');
@@ -59,7 +59,7 @@ export async function loadProblemMeta(id: string): Promise<ProblemMeta> {
 }
 
 export async function loadProblemStatement(id: string): Promise<string> {
-  const mdPath = path.join(PROBLEMS_ROOT, id, 'statement.md');
+  const mdPath = path.join(getProblemsRoot(), id, 'statement.md');
   return readFile(mdPath, 'utf-8');
 }
 
@@ -115,7 +115,7 @@ async function loadTestcasesFromDir(dir: string): Promise<Testcase[]> {
 }
 
 export async function loadSampleTestcases(id: string): Promise<Testcase[]> {
-  return loadTestcasesFromDir(path.join(PROBLEMS_ROOT, id, 'samples'));
+  return loadTestcasesFromDir(path.join(getProblemsRoot(), id, 'samples'));
 }
 
 /**
@@ -123,7 +123,7 @@ export async function loadSampleTestcases(id: string): Promise<Testcase[]> {
  * Only the judge worker may call this.
  */
 export async function loadHiddenTestcases(id: string): Promise<Testcase[]> {
-  return loadTestcasesFromDir(path.join(PROBLEMS_ROOT, id, 'hidden'));
+  return loadTestcasesFromDir(path.join(getProblemsRoot(), id, 'hidden'));
 }
 
 /**
@@ -143,7 +143,7 @@ export async function loadAllTestcases(id: string): Promise<Testcase[]> {
 export async function discoverProblems(): Promise<ProblemMeta[]> {
   let entries: string[];
   try {
-    entries = await readdir(PROBLEMS_ROOT);
+    entries = await readdir(getProblemsRoot());
   } catch {
     return [];
   }

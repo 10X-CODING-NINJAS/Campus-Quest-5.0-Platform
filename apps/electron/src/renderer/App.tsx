@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import TopBar from './components/TopBar';
 import ProblemPanel from './components/ProblemPanel';
 import RightPanel from './components/RightPanel';
@@ -28,6 +28,30 @@ interface HintProgressSnapshot {
   questionsSolved: number;
   hintProgress: 0 | 1 | 2 | 3;
   missionCompleted: boolean;
+}
+
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ color: 'red', padding: '20px', background: 'black', height: '100vh', width: '100vw', overflow: 'auto' }}>
+          <h1>Something went wrong.</h1>
+          <pre>{this.state.error?.toString()}</pre>
+          <pre>{this.state.error?.stack}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export default function App() {
@@ -131,6 +155,12 @@ export default function App() {
     setSocketEpoch((epoch) => epoch + 1);
     fetchProblems();
     fetchSubmissions();
+    
+    // Navigate away from login
+    if (contestState === 'WAITING') setCurrentScreen('lobby');
+    else if (contestState === 'DIAGNOSTICS') setCurrentScreen('diagnostics');
+    else if (contestState === 'LOBBY') setCurrentScreen('lobby');
+    else setCurrentScreen(previousLiveScreen);
   };
 
   useEffect(() => {
@@ -141,12 +171,13 @@ export default function App() {
 
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
-    if (!token || contestState === 'WAITING') {
+    if (!token) {
       setCurrentScreen('login');
       return;
     }
 
-    if (contestState === 'DIAGNOSTICS') setCurrentScreen('diagnostics');
+    if (contestState === 'WAITING') setCurrentScreen('lobby');
+    else if (contestState === 'DIAGNOSTICS') setCurrentScreen('diagnostics');
     else if (contestState === 'LOBBY') setCurrentScreen('lobby');
     else if (contestState === 'LIVE' || contestState === 'PAUSED') setCurrentScreen(previousLiveScreen);
   }, [contestState, previousLiveScreen]);
@@ -213,8 +244,9 @@ export default function App() {
     });
 
     // Check security hook in Electron
+    let removeSecurityListener: (() => void) | undefined;
     if ((window as any).electronAPI?.onSecurityViolation) {
-      (window as any).electronAPI.onSecurityViolation((type: string) => {
+      removeSecurityListener = (window as any).electronAPI.onSecurityViolation((type: string) => {
         setViolationCount((prev) => {
           const newCount = prev + 1;
           if (newCount >= 5) {
@@ -242,6 +274,7 @@ export default function App() {
       activeSocket.off('team:paused', handleTeamPaused);
       activeSocket.off('team:resumed', handleTeamResumed);
       activeSocket.off('submit:result');
+      if (removeSecurityListener) removeSecurityListener();
     };
   }, [socketEpoch]);
 
@@ -300,6 +333,7 @@ export default function App() {
   }
 
   return (
+    <ErrorBoundary>
     <div
       className="flex flex-col h-screen w-screen bg-[#080810] overflow-hidden text-white select-none relative"
       style={{ backgroundImage: `url(${fullBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
@@ -409,5 +443,6 @@ export default function App() {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   );
 }

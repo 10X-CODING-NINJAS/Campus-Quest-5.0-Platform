@@ -16,6 +16,8 @@ import { eq } from 'drizzle-orm';
 import { emitHintProgress, getHintUnlockMessage, syncHintProgressForTeam } from '../services/hint-progress.js';
 import { updateWorkspaceResult } from '../services/workspace.js';
 
+
+
 // ── Job types ─────────────────────────────────────────────────────────────────
 
 export interface RunJobData {
@@ -97,7 +99,7 @@ type WorkerIo = {
 };
 
 export function startJudgeWorker(io?: WorkerIo) {
-  const concurrency = parseInt(process.env.JUDGE_CONCURRENCY ?? '4', 10);
+  const concurrency = parseInt(process.env.JUDGE_CONCURRENCY ?? '2', 10);
 
   const worker = new Worker<JudgeJobData, RunJobResult | SubmitJobResult>(
     JUDGE_QUEUE_NAME,
@@ -188,13 +190,23 @@ async function handleRunJob(data: RunJobData): Promise<RunJobResult> {
       const tc = testcases[i]!;
       const result = await runTestcase(
         data.language,
-        workDir,
+        data.code,
         tc.input || { filePath: tc.inputPath },
         config.timeoutMs,
         config.memoryMb,
       );
 
       let tcVerdict = result.verdict;
+      
+      if (tcVerdict === 'CE') {
+        return {
+          type: 'run',
+          compiled: false,
+          compileError: result.stderr,
+          testcaseResults: [],
+        };
+      }
+
       if (result.verdict === 'AC' && data.customStdin === undefined) {
         const checkerResult = check(
           problem.checkerType ?? 'default',
@@ -294,7 +306,7 @@ async function handleSubmitJob(data: SubmitJobData): Promise<SubmitJobResult> {
 
       const result = await runTestcase(
         data.language,
-        workDir,
+        data.code,
         tc.input || { filePath: tc.inputPath },
         timeLimit,
         memoryLimit,
@@ -304,6 +316,12 @@ async function handleSubmitJob(data: SubmitJobData): Promise<SubmitJobResult> {
       maxMemoryKb = Math.max(maxMemoryKb, result.memoryKb);
 
       let tcVerdict: Verdict = result.verdict;
+      
+      if (tcVerdict === 'CE') {
+        overallVerdict = 'CE';
+        judgeLog.push(`Compile Error:\n${result.stderr}`);
+        break; // Stop recompiling code that doesn't build
+      }
 
       if (result.verdict === 'AC') {
         const checkerResult = check(
