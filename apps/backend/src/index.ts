@@ -7,6 +7,7 @@ import { Server as SocketIOServer } from 'socket.io';
 
 import adminRoutes from './routes/admin';
 import workspaceRoutes from './routes/workspace';
+import demoRoutes from './routes/demo'; // DEMO: remove before production if desired
 import { registerJudgeHandlers } from './socket/judge.handler';
 import { registerContestHandlers } from './socket/contest.handler';
 import { registerPowerupHandlers } from './socket/powerup.handler';
@@ -40,6 +41,7 @@ async function bootstrap() {
   // Register admin API routes
   await fastify.register(adminRoutes);
   await fastify.register(workspaceRoutes);
+  await fastify.register(demoRoutes); // DEMO: remove before production if desired
 
   // Socket.IO
   const io = new SocketIOServer(fastify.server, {

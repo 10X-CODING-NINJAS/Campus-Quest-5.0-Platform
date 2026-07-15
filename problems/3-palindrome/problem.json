@@ -1,0 +1,10 @@
+{
+  "id": "3-palindrome",
+  "title": "Palindrome Check",
+  "difficulty": "Easy",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": ["c", "cpp", "java", "python"],
+  "checkerType": "default",
+  "order": 3
+}
