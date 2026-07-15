@@ -51,6 +51,37 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     return { success: true, message: 'Contest ended globally' };
   });
 
+  // 1d. Resume Global Contest
+  fastify.post('/admin/resume-contest', async (_request, _reply) => {
+    const allContests = await db.select().from(contests);
+    if (allContests.length > 0) {
+      await db.update(contests).set({ status: 'RUNNING' }).where(eq(contests.id, allContests[0].id));
+    }
+    const io = (fastify as any).io;
+    if (io) {
+      io.emit('contest:started');
+    }
+    return { success: true, message: 'Contest resumed globally' };
+  });
+
+  // 1e. Emergency Stop Global Contest (disqualifies all teams, stops contest)
+  fastify.post('/admin/emergency-stop', async (_request, _reply) => {
+    const allContests = await db.select().from(contests);
+    if (allContests.length > 0) {
+      await db.update(contests).set({ status: 'ENDED' }).where(eq(contests.id, allContests[0].id));
+    }
+    
+    // Disqualify and pause all teams
+    await db.update(teams).set({ isPaused: true, isDisqualified: true });
+
+    const io = (fastify as any).io;
+    if (io) {
+      io.emit('contest:ended');
+      io.emit('team:disqualified_all');
+    }
+    return { success: true, message: 'Emergency stop activated. All teams disqualified.' };
+  });
+
   // 2. Resume a Paused Team
   fastify.post('/admin/resume-team', async (request, reply) => {
     const { teamId } = request.body as { teamId: string };

@@ -11,6 +11,7 @@ interface TopBarProps {
   onTeamNameChange?: (name: string) => void;
   currentScreen?: 'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints';
   onNavigate?: (screen: 'coding' | 'hints') => void;
+  hintStage?: number;
 }
 
 export default function TopBar({
@@ -21,7 +22,8 @@ export default function TopBar({
   teamName = 'Team Earth-1610',
   onTeamNameChange,
   currentScreen = 'coding',
-  onNavigate
+  onNavigate,
+  hintStage = 0
 }: TopBarProps) {
   const [seconds, setSeconds] = useState(77 * 60 + 42);
   const [colonVisible, setColonVisible] = useState(true);
@@ -96,12 +98,13 @@ export default function TopBar({
           </button>
           <button
             onClick={() => onNavigate('hints')}
-            className={`px-3 py-1.5 text-xs font-bold font-mono border-2 border-black rounded transition-all shadow-[2px_2px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-none ${
+            className={`px-3 py-1.5 text-xs font-bold font-mono border-2 border-black rounded transition-all shadow-[2px_2px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-none flex items-center gap-1 ${
               currentScreen === 'hints'
                 ? 'bg-yellow-400 text-black'
                 : 'bg-zinc-800 text-zinc-300 hover:text-white'
             }`}
           >
+            {hintStage === 0 && <span className="text-[10px]">🔒</span>}
             HINTS MAP
           </button>
         </div>

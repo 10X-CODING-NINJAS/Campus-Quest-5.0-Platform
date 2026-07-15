@@ -22,6 +22,7 @@ export default function App() {
   const [isTeamPaused, setIsTeamPaused] = useState(false);
   const [powerupCounts, setPowerupCounts] = useState({ SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 });
   const [problems, setProblems] = useState<any[]>([]);
+  const [hintStage, setHintStage] = useState(0);
 
   useEffect(() => {
     const fetchProblems = async () => {
@@ -47,12 +48,22 @@ export default function App() {
       setIsTeamPaused(false);
       setSecurityWarning(null);
     };
+    const handleProgressUpdated = (data: { hintStage: number; solvedCount: number }) => {
+      setHintStage(data.hintStage);
+    };
+
+    const handleDisqualifiedAll = () => {
+      setIsAutoSubmitted(true);
+      setSecurityWarning(null);
+    };
 
     socket.on('contest:started', handleContestStarted);
     socket.on('contest:paused', handleContestPaused);
     socket.on('contest:ended', handleContestEnded);
     socket.on('team:paused', handleTeamPaused);
     socket.on('team:resumed', handleTeamResumed);
+    socket.on('team:progress_updated', handleProgressUpdated);
+    socket.on('team:disqualified_all', handleDisqualifiedAll);
     socket.on('powerup:updated', (counts: any) => setPowerupCounts(counts));
 
     // Initial sync with backend
@@ -61,6 +72,7 @@ export default function App() {
       setContestStatus(data.contestStatus);
       setIsTeamPaused(data.isTeamPaused);
       if (data.powerupCounts) setPowerupCounts(data.powerupCounts);
+      if (data.hintStage !== undefined) setHintStage(data.hintStage);
     });
 
     if ((window as any).electronAPI?.onSecurityViolation) {
@@ -94,6 +106,8 @@ export default function App() {
       socket.off('contest:ended', handleContestEnded);
       socket.off('team:paused', handleTeamPaused);
       socket.off('team:resumed', handleTeamResumed);
+      socket.off('team:progress_updated', handleProgressUpdated);
+      socket.off('team:disqualified_all', handleDisqualifiedAll);
       socket.off('powerup:updated');
       socket.off('contest:sync_result');
     };
@@ -208,12 +222,13 @@ export default function App() {
         onTeamNameChange={setTeamName} 
         currentScreen={currentScreen}
         onNavigate={(screen) => setCurrentScreen(screen)}
+        hintStage={hintStage}
       />
 
       {/* Main Workspace Layout */}
       {currentScreen === 'hints' ? (
         <div className="flex-1 w-full relative min-h-0">
-          <HintsPage />
+          <HintsPage hintStage={hintStage} />
         </div>
       ) : (
         <div className="flex-1 flex overflow-auto p-6 gap-6 items-start justify-center">

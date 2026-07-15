@@ -1,18 +1,17 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-export default function HintsPage() {
+interface HintsPageProps {
+  hintStage: number;
+}
+
+export default function HintsPage({ hintStage }: HintsPageProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
 
   useEffect(() => {
-    if (!mapContainerRef.current) return;
+    if (hintStage === 0 || !mapContainerRef.current) return;
 
     // Initialize MapLibre GL map
     const map = new maplibregl.Map({
@@ -169,23 +168,58 @@ export default function HintsPage() {
         mapRef.current = null;
       }
     };
-  }, []);
+  }, [hintStage]);
+
+  const getHudTitle = () => {
+    if (hintStage === 1) return 'STAGE 1 HINT UNLOCKED';
+    if (hintStage === 2) return 'STAGE 2 HINT UNLOCKED';
+    if (hintStage >= 3) return 'CORE MISSION COMPLETE';
+    return 'NYC 3D ANOMALY SENSOR GRID';
+  };
+
+  const getHudDescription = () => {
+    if (hintStage === 1) {
+      return 'glowing-roads-overlay resonance points to an anomaly at Broadway & Canal Street. Anchor coordinates matched.';
+    }
+    if (hintStage === 2) {
+      return 'multiverse anomaly resonance detected at Wall Street & Broadway. Standard dimensional height matches extrusion values.';
+    }
+    if (hintStage >= 3) {
+      return 'Multiverse Anchors successfully synchronized! Earth-1610 safe. All fragments collected.';
+    }
+    return 'Calibrating dimensional anchors across Manhattan. Standard Earth-1610 buildings heights mapped to extrusions.';
+  };
 
   return (
     <div className="w-full h-full relative bg-[#05050d]" id="hints-page-root">
       {/* Mapbox container filling the viewport */}
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" id="map-libre-container" />
 
+      {/* Lock Overlay when Stage 0 */}
+      {hintStage === 0 && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md p-6 text-center select-none">
+          <div className="bg-[#1a0f2b] border-4 border-purple-600 rounded-xl p-8 max-w-md shadow-[8px_8px_0px_0px_rgba(147,51,234,1)] text-white">
+            <h3 className="text-3xl font-black text-purple-400 mb-4 tracking-widest font-mono uppercase">SENSOR GRID OFFLINE</h3>
+            <p className="text-sm text-zinc-300 leading-relaxed mb-6 font-sans">
+              The NYC Anomaly Sensor Grid is currently locked. Solve at least **3 problems** to establish the initial sync and activate Stage 1 hint tracking!
+            </p>
+            <div className="inline-block px-4 py-2 border-2 border-dashed border-purple-500 text-purple-400 font-mono text-xs uppercase tracking-widest animate-pulse">
+              Solve 3 problems to unlock
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* HUD Info Card overlay */}
       <div className="absolute top-6 left-6 z-10 bg-black/80 border-4 border-black p-4 max-w-sm shadow-[4px_4px_0px_#000] text-white comic-halftone pointer-events-none">
         <div className="bg-yellow-400 text-black border-2 border-black font-comic text-sm px-2.5 py-0.5 transform -rotate-1 shadow-[2px_2px_0px_#000] inline-block mb-3 select-none">
-          NYC 3D ANOMALY SENSOR GRID
+          {getHudTitle()}
         </div>
         <h2 className="font-comic text-xl text-red-500 mb-1 leading-tight tracking-wider uppercase">
-          NYC Web Extrusions
+          {hintStage >= 3 ? 'MISSION ACCOMPLISHED' : 'NYC Web Extrusions'}
         </h2>
         <p className="font-sans text-xs text-zinc-300 leading-relaxed">
-          Calibrating dimensional anchors across Manhattan. Standard Earth-1610 buildings heights mapped to extrusions. Drag to pan, use right-click/Ctrl to rotate pitch.
+          {getHudDescription()}
         </p>
       </div>
     </div>

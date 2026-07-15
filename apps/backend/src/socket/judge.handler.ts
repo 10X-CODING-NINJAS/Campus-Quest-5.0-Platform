@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { problems, submissions, teams } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { SupportedLanguage } from '../judge/languages';
 import { runInSandbox } from '../judge/runner';
 
@@ -80,6 +80,31 @@ export function registerJudgeHandlers(socket: any) {
         runtimeMs: maxRuntime, 
         testCaseResults: results,
       }).returning();
+
+      // Recalculate progress for this team
+      if (overallVerdict === 'AC') {
+        const teamSubmissions = await db.select({
+          problemId: submissions.problemId,
+        })
+        .from(submissions)
+        .where(and(
+          eq(submissions.teamId, teamId),
+          eq(submissions.verdict, 'AC')
+        ));
+
+        const distinctSolved = new Set(teamSubmissions.map(s => s.problemId)).size;
+        let newHintStage = 0;
+        if (distinctSolved >= 10) newHintStage = 3;
+        else if (distinctSolved >= 6) newHintStage = 2;
+        else if (distinctSolved >= 3) newHintStage = 1;
+
+        const currentStage = existingTeam?.hintStage ?? 0;
+        if (newHintStage > currentStage) {
+          await db.update(teams).set({ hintStage: newHintStage }).where(eq(teams.id, teamId));
+          // Emit progress update event to this team client
+          socket.emit('team:progress_updated', { hintStage: newHintStage, solvedCount: distinctSolved });
+        }
+      }
 
       socket.emit('submit:result', submission);
     } catch (err) {

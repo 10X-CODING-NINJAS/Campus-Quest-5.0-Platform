@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { teams, contests, teamPowerups } from '../db/schema';
 import { eq } from 'drizzle-orm';
+import { reportViolation } from '../services/violations';
 
 export function registerContestHandlers(socket: any, io: any) {
   
@@ -13,12 +14,14 @@ export function registerContestHandlers(socket: any, io: any) {
     // Get team status
     const teamId = socket.data?.teamId;
     let isPaused = false;
+    let hintStage = 0;
     let powerupCounts = { SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 };
     
     if (teamId) {
       const teamData = await db.select().from(teams).where(eq(teams.id, teamId));
       if (teamData.length > 0) {
         isPaused = teamData[0].isPaused;
+        hintStage = teamData[0].hintStage;
       }
       
       const allUsages = await db.select()
@@ -35,7 +38,8 @@ export function registerContestHandlers(socket: any, io: any) {
     socket.emit('contest:sync_result', {
       contestStatus: globalContest?.status || 'NOT_STARTED',
       isTeamPaused: isPaused,
-      powerupCounts
+      powerupCounts,
+      hintStage
     });
   });
 
@@ -44,13 +48,23 @@ export function registerContestHandlers(socket: any, io: any) {
     const teamId = socket.data?.teamId;
     if (!teamId) return;
 
-    // Set team to paused in DB
-    await db.update(teams).set({ isPaused: true }).where(eq(teams.id, teamId));
-    
-    // Notify this specific client to show the lockout screen
-    socket.emit('team:paused');
-    
-    // Optional: broadcast to admin dashboard
-    io.to('admin-room').emit('admin:violation_alert', { teamId, type });
+    try {
+      // 1. Persist the violation, increment count, check for disqualification
+      const team = await reportViolation(teamId, type, io);
+
+      if (!team) return;
+
+      // 2. Set team to paused in DB if not disqualified
+      if (team.violationCount < 5) {
+        await db.update(teams).set({ isPaused: true }).where(eq(teams.id, teamId));
+        // Notify this specific client to show the lockout screen
+        socket.emit('team:paused');
+      }
+
+      // 3. Broadcast to admin dashboard
+      io.to('admin-room').emit('admin:violation_alert', { teamId, type, violationCount: team.violationCount });
+    } catch (err: any) {
+      console.error('[Violation Trigger Error]:', err.message);
+    }
   });
 }
