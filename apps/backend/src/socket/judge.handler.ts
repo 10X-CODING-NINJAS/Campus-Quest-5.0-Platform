@@ -43,7 +43,11 @@ export function registerJudgeHandlers(socket: any) {
       let overallVerdict: 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE' = 'AC';
       let maxRuntime = 0;
 
+      socket.emit('submit:progress', { stage: 'COMPILING', currentTest: 0, totalTests: testCases.length });
+
       for (const [i, tc] of testCases.entries()) {
+        socket.emit('submit:progress', { stage: 'RUNNING', currentTest: i + 1, totalTests: testCases.length });
+        
         const result = await runInSandbox(language, code, tc.input, tc.output);
         results.push({ index: i, verdict: result.verdict, runtimeMs: result.runtimeMs, memoryKb: 0 });
         maxRuntime = Math.max(maxRuntime, result.runtimeMs);

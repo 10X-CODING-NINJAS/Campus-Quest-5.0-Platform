@@ -13,47 +13,87 @@ interface LeftSidebarProps {
   onSpiderSenseClick?: () => void;
   powerupCounts?: { SPIDER_SENSE: number; WEB_FLUID: number; SUIT_TECH: number };
   onUsePowerup?: (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => void;
+  solvedCount?: number;
+  totalProblems?: number;
+  currentRank?: number;
+  hintStage?: number;
+  latestVerdict?: string;
 }
 
-export default function LeftSidebar({ onSpiderSenseClick, powerupCounts, onUsePowerup }: LeftSidebarProps) {
+export default function LeftSidebar({
+  onSpiderSenseClick,
+  powerupCounts,
+  onUsePowerup,
+  solvedCount = 0,
+  totalProblems = 10,
+  currentRank = 1,
+  hintStage = 0,
+  latestVerdict = 'none'
+}: LeftSidebarProps) {
   const spideySenseRemaining = 3 - (powerupCounts?.SPIDER_SENSE || 0);
   const webFluidRemaining = 2 - (powerupCounts?.WEB_FLUID || 0);
   const suitTechRemaining = 2 - (powerupCounts?.SUIT_TECH || 0);
+
+  const progressPercent = totalProblems > 0 ? (solvedCount / totalProblems) * 100 : 0;
+
+  const getHintStageLabel = () => {
+    if (hintStage === 1) return 'STAGE 1 (Active)';
+    if (hintStage === 2) return 'STAGE 2 (Resonance)';
+    if (hintStage >= 3) return 'MISSION COMPLETE ✓';
+    return 'LOCKED (Solve 3)';
+  };
 
   return (
     <aside className="w-full bg-[#fdf6e2] comic-panel flex flex-col select-none p-5 text-black h-fit">
       {/* Team Stats Header */}
       <div className="flex items-center justify-between mb-4 border-b-2 border-black/10 pb-2">
         <div className="comic-badge-yellow text-sm font-bold tracking-widest uppercase rounded-none">
-          TEAM STATS
+          MISSION CONTROL HUD
+        </div>
+        <div className="flex items-center gap-1.5 font-mono text-xs font-black">
+          RANK: <span className="bg-yellow-400 text-black border-2 border-black px-2 py-0.5 rounded shadow-[1px_1px_0_#000]">#{currentRank}</span>
         </div>
       </div>
 
-      {/* Horizontal Split */}
+      {/* Stats Split Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Progress Bars */}
+        {/* Progress Bars & Info Panels */}
         <div className="space-y-4">
           <div>
-            <div className="text-black font-display font-bold text-xs uppercase tracking-wider mb-1">
-              FRAGMENT PROGRESS
+            <div className="flex justify-between items-center text-black font-display font-bold text-xs uppercase tracking-wider mb-1">
+              <span>FRAGMENT PROGRESS</span>
+              <span className="font-mono text-xs text-red-600 font-extrabold">{solvedCount}/{totalProblems} Solved</span>
             </div>
-            <div className="w-full h-6 border-3 border-black bg-stone-700 rounded-none shadow-[2px_2px_0px_#000] overflow-hidden">
-              <div className="h-full bg-[#ef4444] border-r-2 border-black rounded-none" style={{ width: '60%' }} />
+            <div className="w-full h-6 border-3 border-black bg-stone-700 rounded-none shadow-[2px_2px_0px_#000] overflow-hidden p-0.5">
+              <div 
+                className="h-full bg-[#ef4444] border-r-2 border-black rounded-none transition-all duration-500" 
+                style={{ width: `${progressPercent}%` }} 
+              />
             </div>
           </div>
 
-          <div>
-            <div className="text-black font-display font-bold text-xs uppercase tracking-wider mb-1">
-              THWIP COUNT
+          <div className="grid grid-cols-2 gap-3.5">
+            <div className="bg-white/60 border-2 border-black p-2 shadow-[2px_2px_0_#000]">
+              <div className="text-[10px] text-zinc-500 font-display font-bold uppercase">HINT SENSOR</div>
+              <div className="font-mono text-[10px] font-black text-purple-700 uppercase mt-0.5">
+                {getHintStageLabel()}
+              </div>
             </div>
-            <div className="w-full h-6 border-3 border-black bg-stone-700 rounded-none shadow-[2px_2px_0px_#000] overflow-hidden">
-              <div className="h-full bg-[#3b82f6] border-r-2 border-black rounded-none" style={{ width: '40%' }} />
+            <div className="bg-white/60 border-2 border-black p-2 shadow-[2px_2px_0_#000]">
+              <div className="text-[10px] text-zinc-500 font-display font-bold uppercase">LAST VERDICT</div>
+              <div className={`font-mono text-[10px] font-black uppercase mt-0.5 ${
+                latestVerdict === 'AC' ? 'text-green-600 animate-pulse' :
+                latestVerdict === 'none' ? 'text-zinc-500' : 'text-red-500'
+              }`}>
+                {latestVerdict}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Spider Actions */}
+        {/* Spider Actions Powerup triggers */}
         <div className="flex flex-col justify-center">
+          <div className="text-[10px] text-zinc-500 font-display font-bold uppercase mb-2">POWERUP ARSENAL</div>
           <div className="grid grid-cols-3 gap-3">
             {/* Spider Sense */}
             <div 

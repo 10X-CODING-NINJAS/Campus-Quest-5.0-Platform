@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../db';
-import { teamWorkspaces, teams } from '../db/schema';
-import { eq, and } from 'drizzle-orm';
+import { teamWorkspaces, teams, submissions } from '../db/schema';
+import { eq, and, desc } from 'drizzle-orm';
 
 export default async function workspaceRoutes(fastify: FastifyInstance) {
   // 1. Get saved workspace for a problem
@@ -106,6 +106,27 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
       return { success: true };
     } catch (err: any) {
       fastify.log.error('Failed to save workspace:', err.message);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  // 3. Get submission history for a problem
+  fastify.get('/api/workspace/:problemId/submissions', async (request, reply) => {
+    const { problemId } = request.params as { problemId: string };
+    const teamId = (request.headers['x-team-id'] as string) || 'unknown-team';
+
+    try {
+      const history = await db.select()
+        .from(submissions)
+        .where(and(
+          eq(submissions.teamId, teamId),
+          eq(submissions.problemId, problemId)
+        ))
+        .orderBy(desc(submissions.createdAt));
+
+      return history;
+    } catch (err: any) {
+      fastify.log.error('Failed to get submission history:', err.message);
       return reply.code(500).send({ error: 'Internal Server Error' });
     }
   });

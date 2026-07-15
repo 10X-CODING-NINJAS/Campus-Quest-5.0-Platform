@@ -23,6 +23,10 @@ export default function App() {
   const [powerupCounts, setPowerupCounts] = useState({ SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 });
   const [problems, setProblems] = useState<any[]>([]);
   const [hintStage, setHintStage] = useState(0);
+  const [solvedCount, setSolvedCount] = useState(0);
+  const [currentRank, setCurrentRank] = useState(1);
+  const [latestVerdict, setLatestVerdict] = useState<string>('none');
+  const [reconnectState, setReconnectState] = useState<'IDLE' | 'DISCONNECTED' | 'RECONNECTING' | 'RESTORED'>('IDLE');
 
   useEffect(() => {
     const fetchProblems = async () => {
@@ -50,11 +54,39 @@ export default function App() {
     };
     const handleProgressUpdated = (data: { hintStage: number; solvedCount: number }) => {
       setHintStage(data.hintStage);
+      setSolvedCount(data.solvedCount);
     };
 
     const handleDisqualifiedAll = () => {
       setIsAutoSubmitted(true);
       setSecurityWarning(null);
+    };
+
+    const handleSubmitResult = (result: any) => {
+      if (result.verdict) {
+        setLatestVerdict(result.verdict);
+        socket.emit('contest:sync');
+      }
+    };
+
+    const handleConnect = () => {
+      setReconnectState(prev => {
+        if (prev === 'RECONNECTING' || prev === 'DISCONNECTED') {
+          // Re-trigger contest sync to ensure state updates
+          socket.emit('contest:sync');
+          setTimeout(() => setReconnectState('IDLE'), 3500);
+          return 'RESTORED';
+        }
+        return 'IDLE';
+      });
+    };
+
+    const handleDisconnect = () => {
+      setReconnectState('DISCONNECTED');
+    };
+
+    const handleConnectError = () => {
+      setReconnectState('RECONNECTING');
     };
 
     socket.on('contest:started', handleContestStarted);
@@ -64,7 +96,11 @@ export default function App() {
     socket.on('team:resumed', handleTeamResumed);
     socket.on('team:progress_updated', handleProgressUpdated);
     socket.on('team:disqualified_all', handleDisqualifiedAll);
+    socket.on('submit:result', handleSubmitResult);
     socket.on('powerup:updated', (counts: any) => setPowerupCounts(counts));
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connect_error', handleConnectError);
 
     // Initial sync with backend
     socket.emit('contest:sync');
@@ -73,6 +109,8 @@ export default function App() {
       setIsTeamPaused(data.isTeamPaused);
       if (data.powerupCounts) setPowerupCounts(data.powerupCounts);
       if (data.hintStage !== undefined) setHintStage(data.hintStage);
+      if (data.solvedCount !== undefined) setSolvedCount(data.solvedCount);
+      if (data.currentRank !== undefined) setCurrentRank(data.currentRank);
     });
 
     if ((window as any).electronAPI?.onSecurityViolation) {
@@ -108,10 +146,14 @@ export default function App() {
       socket.off('team:resumed', handleTeamResumed);
       socket.off('team:progress_updated', handleProgressUpdated);
       socket.off('team:disqualified_all', handleDisqualifiedAll);
+      socket.off('submit:result', handleSubmitResult);
       socket.off('powerup:updated');
       socket.off('contest:sync_result');
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('connect_error', handleConnectError);
     };
-  }, []);
+  }, [reconnectState]);
 
   // Handler for using a powerup directly via socket
   const handleUsePowerup = (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => {
@@ -215,6 +257,23 @@ export default function App() {
         </div>
       )}
 
+      {/* Reconnect Status Banner Alert */}
+      {reconnectState !== 'IDLE' && (
+        <div className={`w-full py-2.5 px-4 border-b-4 border-black flex items-center justify-between text-xs font-mono font-bold select-none transition-all z-50 ${
+          reconnectState === 'DISCONNECTED' ? 'bg-red-500 text-white animate-pulse' :
+          reconnectState === 'RECONNECTING' ? 'bg-yellow-400 text-black animate-pulse' : 'bg-green-500 text-white'
+        }`}>
+          <span className="flex items-center gap-1.5">
+            {reconnectState === 'DISCONNECTED' && "⚠️ DIMENSIONAL PORTAL INTERRUPTED • CHECK YOUR INTERNET ROUTER"}
+            {reconnectState === 'RECONNECTING' && "⚡ DIMENSIONAL SYNAPSE DECAYING • RECONNECTING TO EARTH-1610 ANCHOR..."}
+            {reconnectState === 'RESTORED' && "✓ MULTIVERSE RE-SYNCHRONIZED • WORKSPACE & CONTEST STATE RESTORED!"}
+          </span>
+          <span className="text-[9px] uppercase border border-black/25 px-1.5 py-0.5 bg-black/10">
+            {reconnectState === 'RESTORED' ? 'Resume Coding' : 'Do not close client'}
+          </span>
+        </div>
+      )}
+
       {/* Custom Header with controls & timer */}
       <TopBar 
         isPaused={isTeamPaused || contestStatus !== 'RUNNING'} 
@@ -252,6 +311,11 @@ export default function App() {
             onUseSpideySenseSuccess={() => setCurrentScreen('hints')}
             currentProblem={problems[questionNum - 1] || null}
             teamName={teamName}
+            solvedCount={solvedCount}
+            currentRank={currentRank}
+            latestVerdict={latestVerdict}
+            hintStage={hintStage}
+            totalProblems={problems.length}
           />
         </div>
       )}

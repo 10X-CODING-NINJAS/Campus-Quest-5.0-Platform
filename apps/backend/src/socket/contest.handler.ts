@@ -1,6 +1,6 @@
 import { db } from '../db';
-import { teams, contests, teamPowerups } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { teams, contests, teamPowerups, submissions } from '../db/schema';
+import { eq, and } from 'drizzle-orm';
 import { reportViolation } from '../services/violations';
 
 export function registerContestHandlers(socket: any, io: any) {
@@ -17,6 +17,9 @@ export function registerContestHandlers(socket: any, io: any) {
     let hintStage = 0;
     let powerupCounts = { SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 };
     
+    let solvedCount = 0;
+    let currentRank = 1;
+
     if (teamId) {
       const teamData = await db.select().from(teams).where(eq(teams.id, teamId));
       if (teamData.length > 0) {
@@ -33,13 +36,46 @@ export function registerContestHandlers(socket: any, io: any) {
         WEB_FLUID: allUsages.filter(p => p.type === 'WEB_FLUID').length,
         SUIT_TECH: allUsages.filter(p => p.type === 'SUIT_TECH').length
       };
+
+      // Get solved count
+      const solvedSubmissions = await db.select({
+        problemId: submissions.problemId,
+      })
+      .from(submissions)
+      .where(and(
+        eq(submissions.teamId, teamId),
+        eq(submissions.verdict, 'AC')
+      ));
+      solvedCount = new Set(solvedSubmissions.map(s => s.problemId)).size;
+
+      // Calculate Rank
+      const allTeams = await db.select().from(teams);
+      const teamSolvedCounts = await Promise.all(
+        allTeams.map(async (t) => {
+          const teamSolved = await db.select({
+            problemId: submissions.problemId,
+          })
+          .from(submissions)
+          .where(and(
+            eq(submissions.teamId, t.id),
+            eq(submissions.verdict, 'AC')
+          ));
+          const distinctSolved = new Set(teamSolved.map(s => s.problemId)).size;
+          return { teamId: t.id, solvedCount: distinctSolved };
+        })
+      );
+      teamSolvedCounts.sort((a, b) => b.solvedCount - a.solvedCount);
+      currentRank = teamSolvedCounts.findIndex(item => item.teamId === teamId) + 1;
+      if (currentRank === 0) currentRank = 1;
     }
     
     socket.emit('contest:sync_result', {
       contestStatus: globalContest?.status || 'NOT_STARTED',
       isTeamPaused: isPaused,
       powerupCounts,
-      hintStage
+      hintStage,
+      solvedCount,
+      currentRank
     });
   });
 

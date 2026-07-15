@@ -13,6 +13,11 @@ interface EditorPanelProps {
   onUseSpideySense: () => void;
   submissionResult: SubmissionResult;
   consoleLogs: string[];
+  submissionProgress: {
+    stage: 'IDLE' | 'COMPILING' | 'RUNNING' | 'DONE';
+    currentTest: number;
+    totalTests: number;
+  };
 }
 
 export default function EditorPanel({
@@ -24,7 +29,8 @@ export default function EditorPanel({
   onSubmitCode,
   onUseSpideySense,
   submissionResult,
-  consoleLogs
+  consoleLogs,
+  submissionProgress
 }: EditorPanelProps) {
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -197,6 +203,50 @@ export default function EditorPanel({
           <div ref={logEndRef} />
         </div>
       </div>
+
+      {/* Real-time Submission Progress Overlay */}
+      {submissionProgress && (submissionProgress.stage === 'COMPILING' || submissionProgress.stage === 'RUNNING') && (
+        <div className="absolute inset-0 bg-black/85 backdrop-blur-sm z-30 flex flex-col items-center justify-center p-6 text-center select-none rounded-xl">
+          <div className="bg-[#111] border-4 border-black p-8 max-w-sm rounded-none shadow-[8px_8px_0_px_rgba(0,0,0,1)] text-white relative overflow-hidden">
+            {/* Halftone BG Pattern */}
+            <div 
+              className="absolute inset-0 opacity-5 rounded-none pointer-events-none"
+              style={{
+                backgroundImage: "radial-gradient(circle, #fff 2px, transparent 2px)",
+                backgroundSize: "6px 6px"
+              }}
+            />
+            
+            <div className="bg-red-500 text-white border-2 border-black font-comic text-xs px-2.5 py-0.5 transform -rotate-1 shadow-[2px_2px_0px_#000] inline-block mb-4 tracking-widest uppercase relative z-10">
+              {submissionProgress.stage === 'COMPILING' ? 'INITIALIZING COMPILER' : 'GRID SIMULATION RUNNING'}
+            </div>
+            
+            <h3 className="text-3xl font-black text-yellow-400 mb-2 tracking-widest font-mono uppercase relative z-10">
+              {submissionProgress.stage === 'COMPILING' ? 'COMPILING...' : 'TESTING...'}
+            </h3>
+            
+            {submissionProgress.stage === 'RUNNING' && (
+              <p className="text-sm font-bold text-zinc-300 mb-6 font-mono relative z-10">
+                Executing: Test Case <span className="text-white text-lg font-black">{submissionProgress.currentTest}</span> of <span className="text-zinc-500">{submissionProgress.totalTests}</span>
+              </p>
+            )}
+
+            {/* Premium Comic Progress Bar */}
+            <div className="w-full h-6 bg-zinc-900 border-2 border-black rounded-none overflow-hidden p-0.5 relative z-10">
+              <div 
+                className="h-full bg-gradient-to-r from-red-600 to-yellow-500 transition-all duration-300"
+                style={{ 
+                  width: `${submissionProgress.stage === 'COMPILING' ? 25 : (submissionProgress.currentTest / submissionProgress.totalTests) * 100}%` 
+                }}
+              />
+            </div>
+            
+            <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mt-4 relative z-10">
+              Do not close window • Syncing state
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

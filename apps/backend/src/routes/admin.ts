@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../db';
-import { teams, contests, problems } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { teams, contests, problems, submissions } from '../db/schema';
+import { eq, desc } from 'drizzle-orm';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -127,5 +127,61 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     }));
 
     return problemsWithStarters;
+  });
+
+  // 4. Get all teams with stats
+  fastify.get('/admin/teams', async (_request, _reply) => {
+    const allTeams = await db.select().from(teams);
+    const teamsWithStats = await Promise.all(allTeams.map(async (t) => {
+      const teamSubmissions = await db.select()
+        .from(submissions)
+        .where(eq(submissions.teamId, t.id))
+        .orderBy(submissions.createdAt);
+
+      const submissionCount = teamSubmissions.length;
+      const solvedSubmissions = teamSubmissions.filter(s => s.verdict === 'AC');
+      const distinctSolved = new Set(solvedSubmissions.map(s => s.problemId)).size;
+
+      let penalty = 0;
+      const solvedProblems = new Set<string>();
+      for (const sub of teamSubmissions) {
+        if (sub.verdict === 'AC') {
+          solvedProblems.add(sub.problemId);
+        } else if (!solvedProblems.has(sub.problemId)) {
+          penalty += 20;
+        }
+      }
+
+      const latestSub = await db.select()
+        .from(submissions)
+        .where(eq(submissions.teamId, t.id))
+        .orderBy(desc(submissions.createdAt))
+        .limit(1);
+
+      return {
+        id: t.id,
+        name: t.name,
+        violationCount: t.violationCount,
+        isPaused: t.isPaused,
+        isDisqualified: t.isDisqualified,
+        spiderSenseCharges: t.spiderSenseCharges,
+        hintStage: t.hintStage,
+        solvedCount: distinctSolved,
+        latestVerdict: latestSub[0]?.verdict || 'none',
+        currentProblemId: latestSub[0]?.problemId || 'none',
+        submissionCount,
+        penalty
+      };
+    }));
+    return teamsWithStats;
+  });
+
+  // 5. Get all submissions for feed
+  fastify.get('/admin/submissions', async (_request, _reply) => {
+    const allSubmissions = await db.select()
+      .from(submissions)
+      .orderBy(desc(submissions.createdAt))
+      .limit(100);
+    return allSubmissions;
   });
 }

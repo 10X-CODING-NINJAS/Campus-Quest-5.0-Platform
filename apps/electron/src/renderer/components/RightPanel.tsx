@@ -4,6 +4,7 @@ import LeftSidebar from './LeftSidebar';
 import ComicModal from './ComicModal';
 import EditorPanel from './EditorPanel';
 import SpideySenseModal from './SpideySenseModal';
+import SubmissionHistoryPanel from './SubmissionHistoryPanel';
 import { Challenge, SubmissionResult } from '../types';
 
 const CXX_TEMPLATE = `#include <iostream>
@@ -52,6 +53,11 @@ interface RightPanelProps {
   onUseSpideySenseSuccess?: () => void;
   currentProblem: any;
   teamName: string;
+  solvedCount: number;
+  currentRank: number;
+  latestVerdict: string;
+  hintStage: number;
+  totalProblems: number;
 }
 
 export default function RightPanel({
@@ -62,7 +68,12 @@ export default function RightPanel({
   onUsePowerup,
   onUseSpideySenseSuccess,
   currentProblem,
-  teamName
+  teamName,
+  solvedCount,
+  currentRank,
+  latestVerdict,
+  hintStage,
+  totalProblems
 }: RightPanelProps) {
   const [codes, setCodes] = useState<Record<string, string>>({
     cpp: CXX_TEMPLATE,
@@ -84,7 +95,36 @@ export default function RightPanel({
     totalCount: 0,
   });
 
+  const [submissionProgress, setSubmissionProgress] = useState<{
+    stage: 'IDLE' | 'COMPILING' | 'RUNNING' | 'DONE';
+    currentTest: number;
+    totalTests: number;
+  }>({
+    stage: 'IDLE',
+    currentTest: 0,
+    totalTests: 0,
+  });
+
+  const [submissionHistory, setSubmissionHistory] = useState<any[]>([]);
+
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchSubmissionHistory = async () => {
+    if (!currentProblem) return;
+    try {
+      const res = await fetch(`http://localhost:3001/api/workspace/${currentProblem.id}/submissions`, {
+        headers: {
+          'x-team-id': teamName,
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSubmissionHistory(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch submission history:', err);
+    }
+  };
 
   // 1. Load workspace state from backend on problem switch
   useEffect(() => {
@@ -127,6 +167,7 @@ export default function RightPanel({
     };
 
     loadWorkspace();
+    fetchSubmissionHistory();
   }, [currentProblem, teamName]);
 
   // 2. Handle editor changes and trigger autosave
@@ -177,6 +218,7 @@ export default function RightPanel({
 
   useEffect(() => {
     const onRunResult = (result: any) => {
+      setSubmissionProgress({ stage: 'DONE', currentTest: 0, totalTests: 0 });
       if (result.verdict === 'CE') {
         setConsoleLogs([
           "⚙ Compiling code...",
@@ -211,6 +253,7 @@ export default function RightPanel({
     };
 
     const onSubmitResult = (result: any) => {
+      setSubmissionProgress({ stage: 'DONE', currentTest: 0, totalTests: 0 });
       const verdict = result.verdict;
       const results = result.testCaseResults || [];
       const passed = results.filter((r: any) => r.verdict === 'AC').length;
@@ -234,14 +277,36 @@ export default function RightPanel({
       });
       setModalStatus(verdict === 'AC' ? 'ACCEPTED' : 'FAILED');
       setIsModalOpen(true);
+      fetchSubmissionHistory();
+    };
+
+    const onSubmitProgress = (progress: { stage: 'COMPILING' | 'RUNNING'; currentTest: number; totalTests: number }) => {
+      setSubmissionProgress({
+        stage: progress.stage === 'COMPILING' ? 'COMPILING' : 'RUNNING',
+        currentTest: progress.currentTest,
+        totalTests: progress.totalTests,
+      });
+      if (progress.stage === 'COMPILING') {
+        setConsoleLogs(prev => [
+          ...prev,
+          "⚙ Compiling code...",
+        ]);
+      } else if (progress.stage === 'RUNNING') {
+        setConsoleLogs(prev => [
+          ...prev,
+          `⚙ Running Test ${progress.currentTest} / ${progress.totalTests}...`,
+        ]);
+      }
     };
 
     socket.on('run:result', onRunResult);
     socket.on('submit:result', onSubmitResult);
+    socket.on('submit:progress', onSubmitProgress);
 
     return () => {
       socket.off('run:result', onRunResult);
       socket.off('submit:result', onSubmitResult);
+      socket.off('submit:progress', onSubmitProgress);
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
@@ -300,6 +365,7 @@ export default function RightPanel({
         onUseSpideySense={() => setIsSpideyModalOpen(true)}
         submissionResult={submissionResult}
         consoleLogs={consoleLogs}
+        submissionProgress={submissionProgress}
       />
 
       {/* Team Stats Panel Card */}
@@ -307,7 +373,15 @@ export default function RightPanel({
         onSpiderSenseClick={() => setIsSpideyModalOpen(true)} 
         powerupCounts={powerupCounts}
         onUsePowerup={onUsePowerup}
+        solvedCount={solvedCount}
+        totalProblems={totalProblems}
+        currentRank={currentRank}
+        hintStage={hintStage}
+        latestVerdict={latestVerdict}
       />
+
+      {/* Submission History Accordion Panel */}
+      <SubmissionHistoryPanel submissions={submissionHistory} />
 
       {/* Comic Book Alert Modal */}
       <ComicModal
