@@ -53,7 +53,7 @@ export function startJudgeWorker() {
 
       throw new Error(`Unknown job type`);
     },
-    { connection, concurrency: 4 } // Allow up to 4 concurrent Docker runs
+    { connection: connection as any, concurrency: 4 } // Allow up to 4 concurrent Docker runs
   );
 
   worker.on('ready', () => {

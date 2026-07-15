@@ -1,7 +1,7 @@
 import { db } from '../db';
 import { submissions } from '../db/schema';
 import { eq } from 'drizzle-orm';
-import { judgeQueue } from '../queues/judge.queue';
+import { judgeQueue } from '../judge/queue';
 
 export async function createSubmission(teamId: string, problemId: string, language: string, sourceCode: string) {
   const [submission] = await db.insert(submissions).values({

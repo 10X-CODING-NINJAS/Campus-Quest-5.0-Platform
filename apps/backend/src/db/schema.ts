@@ -1,5 +1,5 @@
 import {
-  pgTable, pgEnum, text, integer, boolean, timestamp, json, uniqueIndex,
+  pgTable, pgEnum, text, integer, boolean, timestamp, json,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { createId } from '@paralleldrive/cuid2';
@@ -88,11 +88,25 @@ export const teamPowerups = pgTable('team_powerups', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+// ---------- Team Workspace (Autosave Persistence) ----------
+export const teamWorkspaces = pgTable('team_workspaces', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  teamId: text('team_id').notNull().references(() => teams.id),
+  problemId: text('problem_id').notNull().references(() => problems.id),
+  language: languageEnum('language').notNull(),
+  sourceCode: text('source_code').notNull(),
+  cursorLine: integer('cursor_line').notNull().default(1),
+  cursorColumn: integer('cursor_column').notNull().default(1),
+  scrollPosition: integer('scroll_position').notNull().default(0),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // ---------- Relations ----------
 export const teamsRelations = relations(teams, ({ many }) => ({
   submissions: many(submissions),
   violations: many(violations),
   powerups: many(teamPowerups),
+  workspaces: many(teamWorkspaces),
 }));
 
 export const submissionsRelations = relations(submissions, ({ one }) => ({
@@ -106,4 +120,9 @@ export const violationsRelations = relations(violations, ({ one }) => ({
 
 export const teamPowerupsRelations = relations(teamPowerups, ({ one }) => ({
   team: one(teams, { fields: [teamPowerups.teamId], references: [teams.id] }),
+}));
+
+export const teamWorkspacesRelations = relations(teamWorkspaces, ({ one }) => ({
+  team: one(teams, { fields: [teamWorkspaces.teamId], references: [teams.id] }),
+  problem: one(problems, { fields: [teamWorkspaces.problemId], references: [problems.id] }),
 }));

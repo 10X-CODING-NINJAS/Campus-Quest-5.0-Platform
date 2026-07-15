@@ -1,0 +1,15 @@
+{
+  "id": "2-fibonacci",
+  "title": "Fibonacci Number",
+  "difficulty": "Easy",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "checkerType": "default",
+  "order": 2
+}

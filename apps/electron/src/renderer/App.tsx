@@ -12,7 +12,7 @@ import { socket } from './lib/socket';
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints'>('login');
   const [teamName, setTeamName] = useState('Team Earth-1610');
-  const [questionNum, setQuestionNum] = useState(7);
+  const [questionNum, setQuestionNum] = useState(1);
   const [selectedLang, setSelectedLang] = useState('cpp');
   const [isSaved, setIsSaved] = useState(true);
   const [securityWarning, setSecurityWarning] = useState<string | null>(null);
@@ -21,32 +21,47 @@ export default function App() {
   const [contestStatus, setContestStatus] = useState<'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'ENDED'>('NOT_STARTED');
   const [isTeamPaused, setIsTeamPaused] = useState(false);
   const [powerupCounts, setPowerupCounts] = useState({ SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 });
+  const [problems, setProblems] = useState<any[]>([]);
 
   useEffect(() => {
-    // Mock socket logic (replace with real socket.io client)
+    const fetchProblems = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/api/problems');
+        if (res.ok) {
+          const data = await res.json();
+          setProblems(data);
+        }
+      } catch (err) {
+        console.error('Error fetching problems:', err);
+      }
+    };
+    fetchProblems();
+  }, []);
+
+  useEffect(() => {
     const handleContestStarted = () => setContestStatus('RUNNING');
+    const handleContestPaused = () => setContestStatus('PAUSED');
+    const handleContestEnded = () => setContestStatus('ENDED');
     const handleTeamPaused = () => setIsTeamPaused(true);
     const handleTeamResumed = () => {
       setIsTeamPaused(false);
       setSecurityWarning(null);
     };
 
-    // If using socket.io:
     socket.on('contest:started', handleContestStarted);
+    socket.on('contest:paused', handleContestPaused);
+    socket.on('contest:ended', handleContestEnded);
     socket.on('team:paused', handleTeamPaused);
     socket.on('team:resumed', handleTeamResumed);
     socket.on('powerup:updated', (counts: any) => setPowerupCounts(counts));
 
-    // Initial sync mock
-    // socket.emit('contest:sync');
-    // socket.on('contest:sync_result', (data) => {
-    //   setContestStatus(data.contestStatus);
-    //   setIsTeamPaused(data.isTeamPaused);
-    //   if (data.powerupCounts) setPowerupCounts(data.powerupCounts);
-    // });
-    
-    // For development without backend, we just set it to RUNNING to allow testing
-    setContestStatus('RUNNING');
+    // Initial sync with backend
+    socket.emit('contest:sync');
+    socket.on('contest:sync_result', (data: any) => {
+      setContestStatus(data.contestStatus);
+      setIsTeamPaused(data.isTeamPaused);
+      if (data.powerupCounts) setPowerupCounts(data.powerupCounts);
+    });
 
     if ((window as any).electronAPI?.onSecurityViolation) {
       (window as any).electronAPI.onSecurityViolation((type: string) => {
@@ -60,7 +75,6 @@ export default function App() {
             // Emit violation to backend to pause the team
             socket.emit('violation:trigger', { type });
             
-            // For now, we simulate the socket response to test UI
             setIsTeamPaused(true);
             setSecurityWarning(
               type === 'blur' 
@@ -76,9 +90,12 @@ export default function App() {
 
     return () => {
       socket.off('contest:started', handleContestStarted);
+      socket.off('contest:paused', handleContestPaused);
+      socket.off('contest:ended', handleContestEnded);
       socket.off('team:paused', handleTeamPaused);
       socket.off('team:resumed', handleTeamResumed);
-      socket.off('powerup:updated', () => {});
+      socket.off('powerup:updated');
+      socket.off('contest:sync_result');
     };
   }, []);
 
@@ -204,6 +221,8 @@ export default function App() {
           <ProblemPanel 
             questionNum={questionNum}
             setQuestionNum={setQuestionNum}
+            currentProblem={problems[questionNum - 1] || null}
+            totalProblems={problems.length}
           />
 
           {/* Code Editor, Test cases and Team Stats panel (Right Column) */}
@@ -216,6 +235,8 @@ export default function App() {
             powerupCounts={powerupCounts}
             onUsePowerup={handleUsePowerup}
             onUseSpideySenseSuccess={() => setCurrentScreen('hints')}
+            currentProblem={problems[questionNum - 1] || null}
+            teamName={teamName}
           />
         </div>
       )}

@@ -1,12 +1,8 @@
-// Placeholder socket until socket.io-client is fully integrated
-export const socket = {
-  emit: (event: string, payload: any) => {
-    console.log(`[Socket emit]: ${event}`, payload);
-  },
-  on: (event: string, _callback: Function) => {
-    console.log(`[Socket on]: ${event} registered`);
-  },
-  off: (event: string, _callback: Function) => {
-    console.log(`[Socket off]: ${event} deregistered`);
-  },
-};
+import { io } from 'socket.io-client';
+
+const SOCKET_URL = 'http://localhost:3001';
+
+export const socket = io(SOCKET_URL, {
+  transports: ['websocket'],
+  autoConnect: true,
+});
