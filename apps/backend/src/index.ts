@@ -46,7 +46,17 @@ async function bootstrap() {
   const fastify = Fastify({ logger: true });
 
   await fastify.register(cors, {
-    origin: CORS_ORIGINS,
+    origin: (origin, cb) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return cb(null, true);
+      // Allow any Vercel preview/production URL
+      if (origin.endsWith('.vercel.app')) return cb(null, true);
+      // Allow localhost for development
+      if (origin.startsWith('http://localhost')) return cb(null, true);
+      // Allow explicitly configured origins
+      if (CORS_ORIGINS.includes(origin)) return cb(null, true);
+      cb(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
   });
 
@@ -68,7 +78,13 @@ async function bootstrap() {
   // Socket.IO
   const io = new SocketIOServer(fastify.server, {
     cors: {
-      origin: CORS_ORIGINS,
+      origin: (origin, cb) => {
+        if (!origin) return cb(null, true);
+        if (origin.endsWith('.vercel.app')) return cb(null, true);
+        if (origin.startsWith('http://localhost')) return cb(null, true);
+        if (CORS_ORIGINS.includes(origin)) return cb(null, true);
+        cb(new Error('Not allowed by CORS'), false);
+      },
       credentials: true,
     },
     transports: ['websocket', 'polling'],
