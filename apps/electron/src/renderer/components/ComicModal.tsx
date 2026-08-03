@@ -82,7 +82,7 @@ export default function ComicModal({
                     POW!
                   </span>
                   <span className="font-comic text-4xl uppercase tracking-widest text-green-700 stroke-white drop-shadow-[2px_2px_0_rgba(0,0,0,1)] bg-yellow-100 border-3 border-black py-1 px-4 rounded transform rotate-3 -mt-1 flex items-center gap-1.5 shadow-[2px_2px_0_rgba(0,0,0,1)] comic-title">
-                    ACCEPTED ✓
+                    MISSION COMPLETE ✓
                   </span>
                 </motion.div>
               </div>

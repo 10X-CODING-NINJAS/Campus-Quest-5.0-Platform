@@ -12,7 +12,7 @@ function WebIcon({ className = '' }: { className?: string }) {
 interface LeftSidebarProps {
   onSpiderSenseClick?: () => void;
   powerupCounts?: { SPIDER_SENSE: number; WEB_FLUID: number; SUIT_TECH: number };
-  onUsePowerup?: (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => void;
+  onUsePowerup?: (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH', problemId?: string) => void;
   solvedCount?: number;
   totalProblems?: number;
   currentRank?: number;
@@ -99,7 +99,6 @@ export default function LeftSidebar({
             <div 
               onClick={() => {
                 if (spideySenseRemaining > 0) {
-                  onUsePowerup?.('SPIDER_SENSE');
                   if (onSpiderSenseClick) onSpiderSenseClick();
                 }
               }}

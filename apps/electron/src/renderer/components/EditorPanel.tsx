@@ -4,8 +4,8 @@ import { Challenge, SubmissionResult } from "../types";
 
 interface EditorPanelProps {
   activeChallenge: Challenge;
-  language: "cpp" | "python" | "javascript" | "java";
-  setLanguage: (lang: "cpp" | "python" | "javascript" | "java") => void;
+  language: "cpp" | "python" | "java";
+  setLanguage: (lang: "cpp" | "python" | "java") => void;
   code: string;
   onChangeCode: (code: string) => void;
   onRunCode: () => void;
@@ -91,14 +91,6 @@ export default function EditorPanel({
             }`}
           >
             Python 3 x
-          </button>
-          <button
-            onClick={() => setLanguage("javascript")}
-            className={`px-3 py-1 border-2 border-black rounded-none text-[10px] font-mono font-black transition shadow-[1px_1px_0_rgba(0,0,0,1)] cursor-pointer ${
-              language === "javascript" ? "bg-sky-500 text-white" : "bg-white text-black hover:bg-zinc-100"
-            }`}
-          >
-            JS/TS x
           </button>
           <button
             onClick={() => setLanguage("java")}

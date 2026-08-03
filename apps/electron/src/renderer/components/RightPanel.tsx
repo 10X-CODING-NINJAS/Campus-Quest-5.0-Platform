@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { socket } from '../lib/socket';
+import { socket, getAuthToken, API_BASE } from '../lib/socket';
 import LeftSidebar from './LeftSidebar';
 import ComicModal from './ComicModal';
 import EditorPanel from './EditorPanel';
@@ -24,12 +24,6 @@ if __name__ == '__main__':
     main()
 `;
 
-const JS_TEMPLATE = `// Write your TypeScript/JavaScript code here
-function main() {
-    console.log("Spider algorithm ready.");
-}
-main();
-`;
 
 const JAVA_TEMPLATE = `import java.util.Scanner;
 
@@ -49,9 +43,11 @@ interface RightPanelProps {
   isSaved: boolean;
   setIsSaved: React.Dispatch<React.SetStateAction<boolean>>;
   powerupCounts: { SPIDER_SENSE: number; WEB_FLUID: number; SUIT_TECH: number };
-  onUsePowerup: (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => void;
+  onUsePowerup: (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH', problemId?: string) => void;
   onUseSpideySenseSuccess?: () => void;
   currentProblem: any;
+  // HIGH-2: teamId is the DB primary key; teamName is the display name
+  teamId: string;
   teamName: string;
   solvedCount: number;
   currentRank: number;
@@ -68,7 +64,8 @@ export default function RightPanel({
   onUsePowerup,
   onUseSpideySenseSuccess,
   currentProblem,
-  teamName,
+  teamId,
+  teamName: _teamName, // kept in props interface for LeftSidebar display; not used directly here
   solvedCount,
   currentRank,
   latestVerdict,
@@ -78,7 +75,6 @@ export default function RightPanel({
   const [codes, setCodes] = useState<Record<string, string>>({
     cpp: CXX_TEMPLATE,
     python: PY_TEMPLATE,
-    javascript: JS_TEMPLATE,
     java: JAVA_TEMPLATE,
   });
 
@@ -112,10 +108,9 @@ export default function RightPanel({
   const fetchSubmissionHistory = async () => {
     if (!currentProblem) return;
     try {
-      const res = await fetch(`http://localhost:3001/api/workspace/${currentProblem.id}/submissions`, {
-        headers: {
-          'x-team-id': teamName,
-        }
+      const token = getAuthToken();
+      const res = await fetch(`${API_BASE}/api/workspace/${currentProblem.id}/submissions`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
@@ -132,10 +127,9 @@ export default function RightPanel({
 
     const loadWorkspace = async () => {
       try {
-        const res = await fetch(`http://localhost:3001/api/workspace/${currentProblem.id}`, {
-          headers: {
-            'x-team-id': teamName,
-          },
+        const token = getAuthToken();
+        const res = await fetch(`${API_BASE}/api/workspace/${currentProblem.id}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
         });
         if (res.ok) {
           const data = await res.json();
@@ -159,7 +153,6 @@ export default function RightPanel({
         setCodes({
           cpp: currentProblem.starters.cpp || CXX_TEMPLATE,
           python: currentProblem.starters.python || PY_TEMPLATE,
-          javascript: currentProblem.starters.javascript || JS_TEMPLATE,
           java: currentProblem.starters.java || JAVA_TEMPLATE,
         });
         setIsSaved(true);
@@ -168,11 +161,11 @@ export default function RightPanel({
 
     loadWorkspace();
     fetchSubmissionHistory();
-  }, [currentProblem, teamName]);
+  }, [currentProblem?.id, teamId]); // M3: use teamId not teamName
 
   // 2. Handle editor changes and trigger autosave
   const handleEditorChange = (value: string) => {
-    const mappedLang = selectedLang === 'javascript' ? 'javascript' : selectedLang === 'python' ? 'python' : selectedLang === 'java' ? 'java' : 'cpp';
+    const mappedLang = selectedLang === 'python' ? 'python' : selectedLang === 'java' ? 'java' : 'cpp';
     setCodes(prev => ({
       ...prev,
       [mappedLang]: value,
@@ -193,11 +186,12 @@ export default function RightPanel({
   const triggerAutosave = async (codeToSave: string, langToSave: string) => {
     if (!currentProblem) return;
     try {
-      const res = await fetch('http://localhost:3001/api/workspace/save', {
+      const token = getAuthToken();
+      const res = await fetch(`${API_BASE}/api/workspace/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-team-id': teamName,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           problemId: currentProblem.id,
@@ -206,6 +200,7 @@ export default function RightPanel({
           cursorLine: 1,
           cursorColumn: 1,
           scrollPosition: 0,
+          clientTimestamp: Date.now(),
         }),
       });
       if (res.ok) {
@@ -313,13 +308,13 @@ export default function RightPanel({
     };
   }, []);
 
-  const mappedLang = selectedLang === 'javascript' ? 'javascript' : selectedLang === 'python' ? 'python' : selectedLang === 'java' ? 'java' : 'cpp';
+  const mappedLang = selectedLang === 'python' ? 'python' : selectedLang === 'java' ? 'java' : 'cpp';
   const currentCode = codes[mappedLang] || '';
 
   // 3. Save workspace immediately on language change
   const handleLanguageChange = (lang: string) => {
     setSelectedLang(lang);
-    const targetLang = lang === 'javascript' ? 'javascript' : lang === 'python' ? 'python' : lang === 'java' ? 'java' : 'cpp';
+    const targetLang = lang === 'python' ? 'python' : lang === 'java' ? 'java' : 'cpp';
     triggerAutosave(codes[targetLang] || '', lang);
   };
 
@@ -399,7 +394,10 @@ export default function RightPanel({
       <SpideySenseModal
         isOpen={isSpideyModalOpen}
         onClose={() => setIsSpideyModalOpen(false)}
-        onUse={onUseSpideySenseSuccess}
+        onUse={() => {
+          onUsePowerup('SPIDER_SENSE', currentProblem?.id);
+          onUseSpideySenseSuccess?.();
+        }}
       />
     </div>
   );

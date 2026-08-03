@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 export async function syncProblemsToDatabase() {
-  const problemsDir = path.resolve(process.cwd(), '../../problems');
+  const problemsDir = process.env.PROBLEMS_DIR || path.resolve(process.cwd(), '../../problems');
   console.log(`[Sync Problems] Scanning problems directory: ${problemsDir}`);
   try {
     const items = await fs.readdir(problemsDir);
@@ -83,5 +83,22 @@ export async function syncProblemsToDatabase() {
     }
   } catch (err: any) {
     console.error('[Sync Problems] Failed to read problems directory:', err.message);
+  }
+
+  // H3: Warn on duplicate problem order values (causes progression bugs)
+  try {
+    const allProblems = await db.select({ id: problems.id, order: problems.order }).from(problems);
+    const orderMap = new Map<number, string[]>();
+    for (const p of allProblems) {
+      if (!orderMap.has(p.order)) orderMap.set(p.order, []);
+      orderMap.get(p.order)!.push(p.id);
+    }
+    for (const [order, ids] of orderMap.entries()) {
+      if (ids.length > 1) {
+        console.warn(`[Sync Problems] ⚠ DUPLICATE ORDER ${order} detected for problems: ${ids.join(', ')}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Sync Problems] Could not validate problem order:', err.message);
   }
 }

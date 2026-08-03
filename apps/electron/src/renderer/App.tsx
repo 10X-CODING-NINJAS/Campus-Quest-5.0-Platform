@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import TopBar from './components/TopBar';
 import ProblemPanel from './components/ProblemPanel';
 import RightPanel from './components/RightPanel';
@@ -7,11 +7,12 @@ import Diagnostics from './components/Diagnostics';
 import Lobby from './components/Lobby';
 import HintsPage from './components/HintsPage';
 import fullBg from '../Assets/Full bg.png';
-import { socket } from './lib/socket';
+import { socket, API_BASE } from './lib/socket';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints'>('login');
   const [teamName, setTeamName] = useState('Team Earth-1610');
+  const [teamId, setTeamId] = useState<string>('');
   const [questionNum, setQuestionNum] = useState(1);
   const [selectedLang, setSelectedLang] = useState('cpp');
   const [isSaved, setIsSaved] = useState(true);
@@ -27,11 +28,17 @@ export default function App() {
   const [currentRank, setCurrentRank] = useState(1);
   const [latestVerdict, setLatestVerdict] = useState<string>('none');
   const [reconnectState, setReconnectState] = useState<'IDLE' | 'DISCONNECTED' | 'RECONNECTING' | 'RESTORED'>('IDLE');
+  // CRITICAL-4: Server-authoritative end time for the contest timer
+  const [contestEndsAt, setContestEndsAt] = useState<string | null>(null);
+  // Track solved problem IDs locally to avoid double-counting before server sync
+  const solvedProblemIdsRef = useRef<Set<string>>(new Set());
+  const bypassedProblemIdsRef = useRef<Set<string>>(new Set());
+  const [maxUnlockedQuestion, setMaxUnlockedQuestion] = useState(1);
 
   useEffect(() => {
     const fetchProblems = async () => {
       try {
-        const res = await fetch('http://localhost:3001/api/problems');
+        const res = await fetch(`${API_BASE}/api/problems`);
         if (res.ok) {
           const data = await res.json();
           setProblems(data);
@@ -43,8 +50,22 @@ export default function App() {
     fetchProblems();
   }, []);
 
+  // MEDIUM-2: Socket event registration uses [] so listeners are registered once.
+  // Reconnect handling uses a separate effect below.
   useEffect(() => {
-    const handleContestStarted = () => setContestStatus('RUNNING');
+    const handleContestStarted = (data?: { endsAt?: string; serverTime?: string }) => {
+      setContestStatus('RUNNING');
+      // CRITICAL-4: Store server-authoritative end time when contest starts
+      if (data?.endsAt) setContestEndsAt(data.endsAt);
+    };
+
+    // CRITICAL-5: contest:resumed is now distinct from contest:started
+    const handleContestResumed = (data?: { endsAt?: string; serverTime?: string }) => {
+      setContestStatus('RUNNING');
+      // Update endsAt with adjusted value (pause time was added back by backend)
+      if (data?.endsAt) setContestEndsAt(data.endsAt);
+    };
+
     const handleContestPaused = () => setContestStatus('PAUSED');
     const handleContestEnded = () => setContestStatus('ENDED');
     const handleTeamPaused = () => setIsTeamPaused(true);
@@ -53,43 +74,78 @@ export default function App() {
       setSecurityWarning(null);
     };
     const handleProgressUpdated = (data: { hintStage: number; solvedCount: number }) => {
+      if (data.hintStage > hintStage && data.hintStage > 0) {
+        let location = '';
+        if (data.hintStage === 1) location = 'Empire State Building';
+        if (data.hintStage === 2) location = 'One World Trade Center';
+        if (data.hintStage === 3) location = 'Chrysler Building';
+        
+        if (location) {
+          alert(`MISSION UPDATE: ${location} synchronized.\n${data.hintStage} / 3 Landmarks Activated.`);
+        }
+      }
       setHintStage(data.hintStage);
       setSolvedCount(data.solvedCount);
     };
-
     const handleDisqualifiedAll = () => {
       setIsAutoSubmitted(true);
       setSecurityWarning(null);
     };
-
     const handleSubmitResult = (result: any) => {
+      // C5: submit:result is now OWNED by RightPanel exclusively.
+      // App.tsx only updates latestVerdict and solved IDs from contest:sync_result.
       if (result.verdict) {
         setLatestVerdict(result.verdict);
+        if (result.verdict === 'AC' && result.problemId) {
+          if (!solvedProblemIdsRef.current.has(result.problemId)) {
+            solvedProblemIdsRef.current.add(result.problemId);
+            setSolvedCount(solvedProblemIdsRef.current.size);
+          }
+        }
+        // Fire a sync to reconcile server state (rank, hints, etc)
         socket.emit('contest:sync');
       }
     };
-
-    const handleConnect = () => {
-      setReconnectState(prev => {
-        if (prev === 'RECONNECTING' || prev === 'DISCONNECTED') {
-          // Re-trigger contest sync to ensure state updates
-          socket.emit('contest:sync');
-          setTimeout(() => setReconnectState('IDLE'), 3500);
-          return 'RESTORED';
+    // MEDIUM-3/4: Named handler references for proper cleanup
+    const handlePowerupUpdated = (counts: any) => setPowerupCounts(counts);
+    const handleSyncResult = (data: any) => {
+      setContestStatus(data.contestStatus);
+      setIsTeamPaused(data.isTeamPaused);
+      if (data.powerupCounts) setPowerupCounts(data.powerupCounts);
+      
+      // Handle hint stage with notification
+      if (data.hintStage !== undefined) {
+        if (data.hintStage > hintStage && data.hintStage > 0) {
+          let location = '';
+          if (data.hintStage === 1) location = 'Empire State Building';
+          if (data.hintStage === 2) location = 'One World Trade Center';
+          if (data.hintStage === 3) location = 'Chrysler Building';
+          
+          if (location) {
+            // Using standard alert for now, can be replaced with custom toast
+            alert(`MISSION UPDATE: ${location} synchronized.\n${data.hintStage} / 3 Landmarks Activated.`);
+          }
         }
-        return 'IDLE';
-      });
-    };
+        setHintStage(data.hintStage);
+      }
+      
+      if (data.solvedCount !== undefined) setSolvedCount(data.solvedCount);
+      if (data.currentRank !== undefined) setCurrentRank(data.currentRank);
+      
+      if (data.solvedProblemIds) {
+        solvedProblemIdsRef.current = new Set(data.solvedProblemIds);
+      }
+      if (data.bypassedProblemIds) {
+        bypassedProblemIdsRef.current = new Set(data.bypassedProblemIds);
+      }
+      setMaxUnlockedQuestion(solvedProblemIdsRef.current.size + bypassedProblemIdsRef.current.size + 1);
 
-    const handleDisconnect = () => {
-      setReconnectState('DISCONNECTED');
-    };
-
-    const handleConnectError = () => {
-      setReconnectState('RECONNECTING');
+      // CRITICAL-4: Restore timer from sync result (handles reconnects)
+      if (data.endsAt) setContestEndsAt(data.endsAt);
     };
 
     socket.on('contest:started', handleContestStarted);
+    socket.on('contest:resumed', handleContestResumed);
     socket.on('contest:paused', handleContestPaused);
     socket.on('contest:ended', handleContestEnded);
     socket.on('team:paused', handleTeamPaused);
@@ -97,49 +153,43 @@ export default function App() {
     socket.on('team:progress_updated', handleProgressUpdated);
     socket.on('team:disqualified_all', handleDisqualifiedAll);
     socket.on('submit:result', handleSubmitResult);
-    socket.on('powerup:updated', (counts: any) => setPowerupCounts(counts));
-    socket.on('connect', handleConnect);
-    socket.on('disconnect', handleDisconnect);
-    socket.on('connect_error', handleConnectError);
-
-    // Initial sync with backend
-    socket.emit('contest:sync');
-    socket.on('contest:sync_result', (data: any) => {
-      setContestStatus(data.contestStatus);
-      setIsTeamPaused(data.isTeamPaused);
-      if (data.powerupCounts) setPowerupCounts(data.powerupCounts);
-      if (data.hintStage !== undefined) setHintStage(data.hintStage);
-      if (data.solvedCount !== undefined) setSolvedCount(data.solvedCount);
+    socket.on('powerup:updated', handlePowerupUpdated);
+    socket.on('contest:sync_result', handleSyncResult);
+    socket.on('leaderboard:update', (data: any) => {
       if (data.currentRank !== undefined) setCurrentRank(data.currentRank);
+      if (data.solvedCount !== undefined) setSolvedCount(data.solvedCount);
     });
 
+    // C4: Do NOT emit contest:sync here. The socket is not connected yet before login.
+    // contest:sync is emitted by the reconnect handler after connectSocket() is called.
+
+    let unsubscribeSecurity: (() => void) | undefined;
     if ((window as any).electronAPI?.onSecurityViolation) {
-      (window as any).electronAPI.onSecurityViolation((type: string) => {
+      unsubscribeSecurity = (window as any).electronAPI.onSecurityViolation((type: string) => {
         setViolationCount((prev) => {
           const newCount = prev + 1;
-          
           if (newCount >= 5) {
             setIsAutoSubmitted(true);
-            setSecurityWarning(null); 
+            setSecurityWarning(null);
           } else {
-            // Emit violation to backend to pause the team
+            // Emit violation to backend — backend pauses the team and alerts admin
             socket.emit('violation:trigger', { type });
-            
             setIsTeamPaused(true);
             setSecurityWarning(
-              type === 'blur' 
-                ? `You switched away from the assessment window! (Violation ${newCount}/5)` 
+              type === 'blur'
+                ? `You switched away from the assessment window! (Violation ${newCount}/5)`
                 : `You attempted to exit full screen mode! (Violation ${newCount}/5)`
             );
           }
-          
           return newCount;
         });
       });
     }
 
     return () => {
+      if (unsubscribeSecurity) unsubscribeSecurity();
       socket.off('contest:started', handleContestStarted);
+      socket.off('contest:resumed', handleContestResumed);
       socket.off('contest:paused', handleContestPaused);
       socket.off('contest:ended', handleContestEnded);
       socket.off('team:paused', handleTeamPaused);
@@ -147,28 +197,51 @@ export default function App() {
       socket.off('team:progress_updated', handleProgressUpdated);
       socket.off('team:disqualified_all', handleDisqualifiedAll);
       socket.off('submit:result', handleSubmitResult);
-      socket.off('powerup:updated');
-      socket.off('contest:sync_result');
+      socket.off('powerup:updated', handlePowerupUpdated);
+      socket.off('contest:sync_result', handleSyncResult);
+      socket.off('leaderboard:update');
+    };
+  }, []); // MEDIUM-2: [] — register once, don't re-register on reconnect
+
+  // MEDIUM-2: Reconnect handling in isolated effect
+  useEffect(() => {
+    const handleConnect = () => {
+      setReconnectState(prev => {
+        if (prev === 'RECONNECTING' || prev === 'DISCONNECTED') {
+          socket.emit('contest:sync');
+          setTimeout(() => setReconnectState('IDLE'), 3500);
+          return 'RESTORED';
+        }
+        return 'IDLE';
+      });
+    };
+    const handleDisconnect = () => setReconnectState('DISCONNECTED');
+    const handleConnectError = () => setReconnectState('RECONNECTING');
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connect_error', handleConnectError);
+
+    return () => {
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('connect_error', handleConnectError);
     };
   }, [reconnectState]);
 
-  // Handler for using a powerup directly via socket
-  const handleUsePowerup = (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH') => {
-    // If using real socket:
-    socket.emit('powerup:use', { type });
-    
-    // Mock for UI:
-    setPowerupCounts(prev => ({
-      ...prev,
-      [type]: prev[type] + 1
-    }));
+  // HIGH-5: No optimistic update — powerup:updated event from server is authoritative
+  const handleUsePowerup = (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH', problemId?: string) => {
+    socket.emit('powerup:use', { type, problemId });
+    // Do NOT optimistically update powerupCounts here.
+    // The server emits 'powerup:updated' with the authoritative counts on success.
   };
 
   if (currentScreen === 'login') {
-    return <LoginPage onLogin={() => setCurrentScreen('diagnostics')} />;
+    return <LoginPage onLogin={(tid, tname) => {
+      setTeamId(tid);
+      setTeamName(tname);
+      setCurrentScreen('diagnostics');
+    }} />;
   }
 
   if (currentScreen === 'diagnostics') {
@@ -216,16 +289,6 @@ export default function App() {
             </p>
             <div className="inline-block px-6 py-3 border-2 border-red-600 text-red-500 font-mono text-sm uppercase tracking-widest animate-pulse">
               PENDING ADMIN REVIEW...
-            </div>
-            
-            {/* Developer bypass just for testing the UI locally */}
-            <div className="mt-8">
-              <button 
-                onClick={() => { setIsTeamPaused(false); setSecurityWarning(null); }}
-                className="text-[10px] text-gray-500 hover:text-gray-300 underline"
-              >
-                [Dev] Mock Admin Resume
-              </button>
             </div>
           </div>
         </div>
@@ -275,13 +338,14 @@ export default function App() {
       )}
 
       {/* Custom Header with controls & timer */}
-      <TopBar 
-        isPaused={isTeamPaused || contestStatus !== 'RUNNING'} 
-        teamName={teamName} 
-        onTeamNameChange={setTeamName} 
+      <TopBar
+        isPaused={isTeamPaused || contestStatus !== 'RUNNING'}
+        teamName={teamName}
+        onTeamNameChange={setTeamName}
         currentScreen={currentScreen}
         onNavigate={(screen) => setCurrentScreen(screen)}
         hintStage={hintStage}
+        contestEndsAt={contestEndsAt}
       />
 
       {/* Main Workspace Layout */}
@@ -297,10 +361,15 @@ export default function App() {
             setQuestionNum={setQuestionNum}
             currentProblem={problems[questionNum - 1] || null}
             totalProblems={problems.length}
+            maxUnlockedQuestion={maxUnlockedQuestion}
+            solvedProblemIds={solvedProblemIdsRef.current}
+            bypassedProblemIds={bypassedProblemIdsRef.current}
+            problems={problems}
           />
 
           {/* Code Editor, Test cases and Team Stats panel (Right Column) */}
-          <RightPanel 
+          {/* HIGH-2: teamId passed explicitly so workspace saves use the DB ID, not display name */}
+          <RightPanel
             questionNum={questionNum}
             selectedLang={selectedLang}
             setSelectedLang={setSelectedLang}
@@ -310,6 +379,7 @@ export default function App() {
             onUsePowerup={handleUsePowerup}
             onUseSpideySenseSuccess={() => setCurrentScreen('hints')}
             currentProblem={problems[questionNum - 1] || null}
+            teamId={teamId}
             teamName={teamName}
             solvedCount={solvedCount}
             currentRank={currentRank}

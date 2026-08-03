@@ -3,7 +3,7 @@ import { Calendar, Clock, Code } from 'lucide-react';
 
 interface Submission {
   id: string;
-  verdict: 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE';
+  verdict: 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE' | 'BYPASSED';
   runtimeMs: number;
   memoryKb: number;
   language: string;
@@ -28,6 +28,8 @@ export default function SubmissionHistoryPanel({ submissions }: SubmissionHistor
         return 'bg-green-100 text-green-700 border-green-400';
       case 'CE':
         return 'bg-yellow-100 text-yellow-700 border-yellow-400';
+      case 'BYPASSED':
+        return 'bg-orange-100 text-orange-700 border-orange-400';
       default:
         return 'bg-red-100 text-red-700 border-red-400';
     }
@@ -69,7 +71,7 @@ export default function SubmissionHistoryPanel({ submissions }: SubmissionHistor
                       #{attemptNum}
                     </span>
                     <span className={`font-mono text-[10px] font-black border-2 px-1.5 py-0.5 rounded ${getVerdictStyle(sub.verdict)}`}>
-                      {sub.verdict}
+                      {sub.verdict === 'BYPASSED' ? 'MISSION BYPASSED' : sub.verdict}
                     </span>
                     <span className="font-mono text-[10px] text-zinc-600 bg-zinc-100 border border-black/10 px-1.5 py-0.5">
                       {sub.language.toUpperCase()}

@@ -83,11 +83,18 @@ export async function runInSandbox(
   }
 }
 
+const MAX_OUTPUT_SIZE = 1024 * 1024; // 1MB limit for stdout/stderr to prevent OOM
+
 function runCompiler(cmd: string, args: string[]): Promise<{ exitCode: number; stderr: string }> {
   return new Promise((resolve) => {
     const proc = spawn(cmd, args);
     let stderr = '';
-    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.stderr.on('data', (d) => {
+      stderr += d.toString();
+      if (stderr.length > MAX_OUTPUT_SIZE) {
+        proc.kill('SIGKILL');
+      }
+    });
     proc.on('close', (code) => {
       resolve({ exitCode: code ?? -1, stderr });
     });
@@ -118,8 +125,18 @@ function executeCommand(
     }
     proc.stdin.end();
 
-    proc.stdout.on('data', (d) => (stdout += d.toString()));
-    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.stdout.on('data', (d) => {
+      stdout += d.toString();
+      if (stdout.length > MAX_OUTPUT_SIZE) {
+        proc.kill('SIGKILL');
+      }
+    });
+    proc.stderr.on('data', (d) => {
+      stderr += d.toString();
+      if (stderr.length > MAX_OUTPUT_SIZE) {
+        proc.kill('SIGKILL');
+      }
+    });
 
     proc.on('close', (code) => {
       clearTimeout(timer);

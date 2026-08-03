@@ -6,38 +6,49 @@ interface TopBarProps {
   isPaused?: boolean;
   isLobby?: boolean;
   solidBg?: boolean;
-  hideSubmit?: boolean;
   teamName?: string;
   onTeamNameChange?: (name: string) => void;
   currentScreen?: 'login' | 'diagnostics' | 'lobby' | 'coding' | 'hints';
   onNavigate?: (screen: 'coding' | 'hints') => void;
   hintStage?: number;
+  // CRITICAL-4: Server-authoritative end time (ISO string) for the contest timer
+  contestEndsAt?: string | null;
 }
 
 export default function TopBar({
   isPaused = false,
   isLobby = false,
   solidBg = false,
-  hideSubmit = false,
   teamName = 'Team Earth-1610',
   onTeamNameChange,
   currentScreen = 'coding',
   onNavigate,
-  hintStage = 0
+  hintStage = 0,
+  contestEndsAt = null,
 }: TopBarProps) {
-  const [seconds, setSeconds] = useState(77 * 60 + 42);
-  const [colonVisible, setColonVisible] = useState(true);
-  const isRunning = true;
+  // CRITICAL-4: Derive remaining seconds from server end time
+  const computeRemaining = () => {
+    if (!contestEndsAt) return 0;
+    return Math.max(0, Math.floor((new Date(contestEndsAt).getTime() - Date.now()) / 1000));
+  };
 
+  const [seconds, setSeconds] = useState(computeRemaining);
+  const [colonVisible, setColonVisible] = useState(true);
+
+  // Recompute remaining time whenever contestEndsAt changes (start, resume, reconnect)
   useEffect(() => {
-    let interval: any;
-    if (isRunning && !isPaused) {
-      interval = setInterval(() => {
-        setSeconds(s => (s > 0 ? s - 1 : 0));
-      }, 1000);
-    }
+    setSeconds(computeRemaining());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contestEndsAt]);
+
+  // Tick down every second, stops when paused or at 0
+  useEffect(() => {
+    if (isPaused || seconds <= 0) return;
+    const interval = setInterval(() => {
+      setSeconds(s => Math.max(0, s - 1));
+    }, 1000);
     return () => clearInterval(interval);
-  }, [isRunning, isPaused]);
+  }, [isPaused, seconds > 0]);
 
   useEffect(() => {
     const blink = setInterval(() => setColonVisible(v => !v), 500);
@@ -155,22 +166,7 @@ export default function TopBar({
         </h1>
       </div>
 
-      {/* Submit Test Button */}
-      {!hideSubmit && (
-        <button 
-          onClick={() => {
-            if (window.confirm("Are you sure you want to submit the test? This action cannot be undone.")) {
-              alert("Test submitted successfully!");
-              if ((window as any).electronAPI) {
-                (window as any).electronAPI.close();
-              }
-            }
-          }}
-          className="mr-3 px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 active:translate-x-0.5 active:shadow-[0px_0px_0px_0px_#000] transition-all comic-halftone whitespace-nowrap text-sm"
-        >
-          SUBMIT TEST
-        </button>
-      )}
+
 
       {/* Controls */}
       <div className="flex items-center gap-1.5 bg-[#1a1a2e] border-2 border-black rounded-lg p-1.5 shadow-[2px_2px_0px_0px_#000]">

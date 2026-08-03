@@ -68,8 +68,16 @@ export default function SpideySenseModal({ isOpen, onClose, onUse }: SpideySense
             />
           </div>
 
+          {/* Text Overlay for UX Polish */}
+          <div className="absolute top-[50%] left-[20%] right-[20%] bg-[#05050d] border-4 border-[#ef4444] p-4 text-center shadow-[4px_4px_0_#ef4444] z-20">
+            <h2 className="font-display font-black text-2xl text-[#ef4444] mb-2 uppercase tracking-widest">Establish Alternative Route</h2>
+            <p className="font-sans text-sm text-white font-bold leading-relaxed">
+              Activate Spider-Sense to bypass this mission and uncover an alternate path.<br/>
+              <span className="text-[#fde047]">WARNING: This action cannot be undone. No fragments will be awarded.</span>
+            </p>
+          </div>
+
           {/* MASSIVE INVISIBLE HITBOXES TO COVER THE BAKED-IN BUTTONS */}
-          {/* The visual buttons are located between the text (at 59%) and the bottom of the content (at 78%). */}
           <div className="absolute top-[65%] left-[20%] right-[20%] h-[13%] flex gap-[2%] z-30">
             {/* CANCEL HITBOX */}
             <button
@@ -82,14 +90,13 @@ export default function SpideySenseModal({ isOpen, onClose, onUse }: SpideySense
             {/* USE BUTTON HITBOX */}
             <button
               onClick={() => {
-                alert("SPIDEY SENSE DEPLOYED!");
                 onUse?.();
                 onClose();
               }}
               type="button"
               className="flex-[1.2] h-full cursor-pointer bg-transparent"
-              title="USE SPIDEY SENSE"
-              aria-label="Use Spidey Sense"
+              title="ESTABLISH ROUTE"
+              aria-label="Establish Route"
             />
           </div>
         </motion.div>

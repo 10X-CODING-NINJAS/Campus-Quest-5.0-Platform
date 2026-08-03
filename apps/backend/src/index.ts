@@ -6,20 +6,34 @@ import rateLimit from '@fastify/rate-limit';
 import { Server as SocketIOServer } from 'socket.io';
 
 import adminRoutes from './routes/admin';
+import { seedTestTeams } from './routes/admin';
 import workspaceRoutes from './routes/workspace';
 import demoRoutes from './routes/demo'; // DEMO: remove before production if desired
 import { registerJudgeHandlers } from './socket/judge.handler';
 import { registerContestHandlers } from './socket/contest.handler';
 import { registerPowerupHandlers } from './socket/powerup.handler';
 import { syncProblemsToDatabase } from './services/problems';
+import jwt from 'jsonwebtoken';
+import { JWT_SECRET, ADMIN_SECRET } from './routes/admin';
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 const HOST = process.env.HOST ?? '0.0.0.0';
 const CORS_ORIGINS = (process.env.CORS_ORIGINS ?? 'http://localhost:5173,http://localhost:5174,http://localhost:3000').split(',');
 
 async function bootstrap() {
+  // M4: Validate required environment variables before doing anything
+  const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'ADMIN_SECRET'];
+  const missing = REQUIRED_ENV.filter(key => !process.env[key]);
+  if (missing.length > 0) {
+    console.error(`[Startup] ❌ Missing required environment variables: ${missing.join(', ')}`);
+    console.error('[Startup] Please check your .env file and restart.');
+    process.exit(1);
+  }
+
   // Sync local problems to database
   await syncProblemsToDatabase();
+  // Seed test / dev teams (idempotent)
+  await seedTestTeams();
 
   const fastify = Fastify({ logger: true });
 
@@ -54,14 +68,35 @@ async function bootstrap() {
 
   (fastify as any).io = io;
 
+  // Socket.IO Auth Middleware
+  io.use((socket, next) => {
+    // Admin connections can authenticate using the ADMIN_SECRET
+    if (socket.handshake.auth?.adminSecret === ADMIN_SECRET) {
+      socket.data = { isAdmin: true };
+      return next();
+    }
+
+    // Normal clients must authenticate using JWT
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+      return next(new Error('Authentication token missing'));
+    }
+
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { teamId: string; teamName: string };
+      socket.data = { teamId: decoded.teamId, teamName: decoded.teamName };
+      next();
+    } catch (err) {
+      next(new Error('Invalid token'));
+    }
+  });
+
   io.on('connection', (socket) => {
     fastify.log.info(`[Socket] Client connected: ${socket.id}`);
 
-    // Join a default room or extract teamId if passed in handshake auth
-    const teamId = socket.handshake.auth?.teamId;
+    // Join a default room or extract teamId from decoded token
+    const teamId = socket.data?.teamId;
     if (teamId) {
-      socket.data = socket.data || {};
-      socket.data.teamId = teamId;
       socket.join(teamId);
       socket.join(`team:${teamId}`);
       fastify.log.info(`[Socket] Client ${socket.id} associated with team: ${teamId}`);
@@ -71,6 +106,16 @@ async function bootstrap() {
     registerContestHandlers(socket, io);
     registerPowerupHandlers(socket, io);
 
+    // Admin dashboard joins the admin-room to receive broadcast events
+    socket.on('join:admin', () => {
+      if (socket.data?.isAdmin) {
+        socket.join('admin-room');
+        fastify.log.info(`[Socket] Admin ${socket.id} joined admin-room`);
+      } else {
+        fastify.log.warn(`[Socket] Unauthorized join:admin attempt by ${socket.id}`);
+      }
+    });
+
     socket.on('disconnect', () => {
       fastify.log.info(`[Socket] Client disconnected: ${socket.id}`);
     });
@@ -79,12 +124,17 @@ async function bootstrap() {
   await fastify.listen({ port: PORT, host: HOST });
   console.log(`\n🚀 Campus Quest Backend running at http://${HOST}:${PORT}`);
   console.log(`📡 Socket.IO attached`);
+  console.log(`🔒 JWT auth: ENABLED | Admin auth: ENABLED`);
+  console.log(`🌐 CORS origins: ${CORS_ORIGINS.join(', ')}`);
+  console.log(`⚡ Rate limit: 200 req/min`);
 
   const signals: NodeJS.Signals[] = ['SIGTERM', 'SIGINT'];
   for (const signal of signals) {
     process.on(signal, async () => {
-      console.log(`\n[Shutdown] ${signal} received, shutting down…`);
+      console.log(`\n[Shutdown] ${signal} received, shutting down gracefully…`);
+      io.close();
       await fastify.close();
+      console.log('[Shutdown] Server closed. Goodbye.');
       process.exit(0);
     });
   }

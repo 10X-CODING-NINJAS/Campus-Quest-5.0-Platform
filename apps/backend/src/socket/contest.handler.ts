@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { teams, contests, teamPowerups, submissions } from '../db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
+import { calculateLeaderboard } from '../utils/leaderboard';
 import { reportViolation } from '../services/violations';
 
 export function registerContestHandlers(socket: any, io: any) {
@@ -18,6 +19,8 @@ export function registerContestHandlers(socket: any, io: any) {
     let powerupCounts = { SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 };
     
     let solvedCount = 0;
+    let solvedProblemIds: string[] = [];
+    let bypassedProblemIds: string[] = [];
     let currentRank = 1;
 
     if (teamId) {
@@ -37,36 +40,28 @@ export function registerContestHandlers(socket: any, io: any) {
         SUIT_TECH: allUsages.filter(p => p.type === 'SUIT_TECH').length
       };
 
-      // Get solved count
-      const solvedSubmissions = await db.select({
+      // Get solved and bypassed count
+      const allTeamSubmissions = await db.select({
         problemId: submissions.problemId,
+        verdict: submissions.verdict,
       })
       .from(submissions)
       .where(and(
         eq(submissions.teamId, teamId),
-        eq(submissions.verdict, 'AC')
+        inArray(submissions.verdict, ['AC', 'BYPASSED'])
       ));
-      solvedCount = new Set(solvedSubmissions.map(s => s.problemId)).size;
+      
+      const solvedList = allTeamSubmissions.filter(s => s.verdict === 'AC').map(s => s.problemId);
+      const bypassedList = allTeamSubmissions.filter(s => s.verdict === 'BYPASSED').map(s => s.problemId);
 
-      // Calculate Rank
-      const allTeams = await db.select().from(teams);
-      const teamSolvedCounts = await Promise.all(
-        allTeams.map(async (t) => {
-          const teamSolved = await db.select({
-            problemId: submissions.problemId,
-          })
-          .from(submissions)
-          .where(and(
-            eq(submissions.teamId, t.id),
-            eq(submissions.verdict, 'AC')
-          ));
-          const distinctSolved = new Set(teamSolved.map(s => s.problemId)).size;
-          return { teamId: t.id, solvedCount: distinctSolved };
-        })
-      );
-      teamSolvedCounts.sort((a, b) => b.solvedCount - a.solvedCount);
-      currentRank = teamSolvedCounts.findIndex(item => item.teamId === teamId) + 1;
-      if (currentRank === 0) currentRank = 1;
+      solvedProblemIds = Array.from(new Set(solvedList));
+      bypassedProblemIds = Array.from(new Set(bypassedList));
+      solvedCount = solvedProblemIds.length;
+
+      // H4: Compute rank using the unified leaderboard utility
+      const leaderboard = await calculateLeaderboard(db);
+      const teamStats = leaderboard.find(t => t.id === teamId);
+      currentRank = teamStats?.rank ?? 1;
     }
     
     socket.emit('contest:sync_result', {
@@ -75,7 +70,12 @@ export function registerContestHandlers(socket: any, io: any) {
       powerupCounts,
       hintStage,
       solvedCount,
-      currentRank
+      solvedProblemIds,
+      bypassedProblemIds,
+      currentRank,
+      // Timing data for client-side timer synchronization
+      endsAt: globalContest?.endsAt ? new Date(globalContest.endsAt).toISOString() : null,
+      serverTime: new Date().toISOString(),
     });
   });
 

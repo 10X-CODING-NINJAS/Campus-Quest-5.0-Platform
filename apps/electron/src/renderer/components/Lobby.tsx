@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import lobbyBg from '../../Assets/Page 3.png';
 import GlitchText from './GlitchText';
 import TopBar from './TopBar';
+import { socket } from '../lib/socket';
 
 interface LobbyProps {
   onProceed: () => void;
@@ -15,11 +16,10 @@ interface LobbyProps {
 }
 
 export default function Lobby({ onProceed, teamName, onTeamNameChange }: LobbyProps) {
-  const [timeLeft, setTimeLeft] = useState(120); // 2 minutes countdown
-  const [teamsConnected, setTeamsConnected] = useState(12);
+  const [timeLeft, setTimeLeft] = useState(120); // cosmetic countdown while waiting
   const [isStarting, setIsStarting] = useState(false);
 
-  // 1. Ticking Countdown Timer
+  // 1. Cosmetic countdown timer (does NOT trigger lobby exit)
   useEffect(() => {
     if (timeLeft <= 0) return;
     const timer = setInterval(() => {
@@ -28,26 +28,22 @@ export default function Lobby({ onProceed, teamName, onTeamNameChange }: LobbyPr
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  // 2. Simulating Teams Connecting (Increments from 12 to 30)
+  // HIGH-8: Lobby exits ONLY when admin fires 'contest:started' from the backend.
+  // The previous fake team counter that auto-proceeded after ~2 min has been removed.
   useEffect(() => {
-    if (teamsConnected >= 30) {
-      // Once all teams are connected, simulate admin starting the test
+    const handleContestStarted = () => {
       setIsStarting(true);
-      const startTimeout = setTimeout(() => {
-        onProceed();
-      }, 3000); // 3 seconds delay for dramatic effect
-      return () => clearTimeout(startTimeout);
-    }
+      // Short dramatic delay then transition to coding screen
+      const t = setTimeout(() => onProceed(), 2000);
+      return () => clearTimeout(t);
+    };
 
-    const delay = Math.random() * 2000 + 1000; // random interval between 1-3s
-    const connectionTimer = setTimeout(() => {
-      setTeamsConnected(prev => Math.min(30, prev + Math.floor(Math.random() * 2) + 1));
-    }, delay);
+    socket.on('contest:started', handleContestStarted);
+    return () => {
+      socket.off('contest:started', handleContestStarted);
+    };
+  }, [onProceed]);
 
-    return () => clearTimeout(connectionTimer);
-  }, [teamsConnected, onProceed]);
-
-  // Format time as MM:SS
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
     const secs = (seconds % 60).toString().padStart(2, '0');
@@ -59,7 +55,7 @@ export default function Lobby({ onProceed, teamName, onTeamNameChange }: LobbyPr
       className="h-screen w-screen bg-[#05050d] flex flex-col overflow-hidden select-none relative"
       style={{ backgroundImage: `url(${lobbyBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
     >
-      <TopBar isLobby={true} hideSubmit={true} teamName={teamName} onTeamNameChange={onTeamNameChange} />
+      <TopBar isLobby={true} teamName={teamName} onTeamNameChange={onTeamNameChange} />
       {/* Halftone texture overlay for comic printed feel */}
       <div className="absolute inset-0 comic-halftone opacity-20 pointer-events-none z-0" />
 
@@ -84,22 +80,22 @@ export default function Lobby({ onProceed, teamName, onTeamNameChange }: LobbyPr
         )}
       </div>
 
-      {/* Bottom Area: Teams connected text out of 30 */}
+      {/* Bottom Area: Waiting for admin */}
       <div className="absolute bottom-[10%] left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-2 z-10">
         <div className="font-comic text-2xl sm:text-3xl text-white tracking-widest uppercase select-none italic text-center drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">
-          TEAMS CONNECTED: <span className={teamsConnected === 30 ? 'text-emerald-400 animate-pulse' : 'text-yellow-400'}>{teamsConnected}</span> / 30
+          {isStarting
+            ? <span className="text-emerald-400 animate-pulse">ENTERING THE SPIDER-VERSE...</span>
+            : <span>AWAITING ADMIN START SIGNAL<span className="animate-pulse">...</span></span>
+          }
         </div>
-        
-        {/* Connection status bar indicator */}
-        <div className="w-[320px] bg-zinc-900 border-3 border-black h-5 overflow-hidden relative shadow-[3px_3px_0px_rgba(0,0,0,1)]">
-          <div 
-            className="h-full bg-gradient-to-r from-red-600 to-red-500 transition-all duration-500 ease-out" 
-            style={{ width: `${(teamsConnected / 30) * 100}%` }}
-          />
-          {/* Grid Hatch Overlay */}
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.15)_1px,transparent_1px)] bg-[size:6px_100%] pointer-events-none" />
+        <div className="flex items-center gap-2 mt-1">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+          <span className="font-mono text-xs text-zinc-400 uppercase tracking-widest">
+            {isStarting ? 'Synchronizing multiverse...' : 'Standing by'}
+          </span>
         </div>
       </div>
     </div>
   );
 }
+

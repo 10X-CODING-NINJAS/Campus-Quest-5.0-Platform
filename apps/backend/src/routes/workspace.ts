@@ -2,12 +2,29 @@ import { FastifyInstance } from 'fastify';
 import { db } from '../db';
 import { teamWorkspaces, teams, submissions } from '../db/schema';
 import { eq, and, desc } from 'drizzle-orm';
+import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from './admin';
+
+/** Extract and verify teamId from JWT Authorization header. Returns null if invalid. */
+function extractTeamId(request: any): string | null {
+  const auth = request.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) return null;
+  try {
+    const decoded = jwt.verify(auth.slice(7), JWT_SECRET) as { teamId: string };
+    return decoded.teamId;
+  } catch {
+    return null;
+  }
+}
 
 export default async function workspaceRoutes(fastify: FastifyInstance) {
   // 1. Get saved workspace for a problem
   fastify.get('/api/workspace/:problemId', async (request, reply) => {
     const { problemId } = request.params as { problemId: string };
-    const teamId = (request.headers['x-team-id'] as string) || 'unknown-team';
+    const teamId = extractTeamId(request);
+    if (!teamId) {
+      return reply.code(401).send({ error: 'Unauthorized', message: 'Valid JWT required to access workspace.' });
+    }
 
     try {
       const [workspace] = await db.select()
@@ -36,7 +53,10 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
 
   // 2. Save workspace autosave state
   fastify.post('/api/workspace/save', async (request, reply) => {
-    const teamId = (request.headers['x-team-id'] as string) || 'unknown-team';
+    const teamId = extractTeamId(request);
+    if (!teamId) {
+      return reply.code(401).send({ error: 'Unauthorized', message: 'Valid JWT required to save workspace.' });
+    }
     const {
       problemId,
       language,
@@ -44,6 +64,7 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
       cursorLine,
       cursorColumn,
       scrollPosition,
+      clientTimestamp,
     } = request.body as {
       problemId: string;
       language: 'C' | 'CPP' | 'PYTHON' | 'JAVA';
@@ -51,6 +72,7 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
       cursorLine?: number;
       cursorColumn?: number;
       scrollPosition?: number;
+      clientTimestamp?: number;
     };
 
     if (!problemId || !language || sourceCode === undefined) {
@@ -79,13 +101,23 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
 
       if (existingWorkspace) {
         // Update
+        // Check if the incoming payload is older than the last save
+        const incomingTime = clientTimestamp ?? 0;
+        const lastSavedTime = existingWorkspace.lastClientUpdate || 0;
+        
+        if (incomingTime > 0 && incomingTime <= lastSavedTime) {
+          // Reject stale payload silently
+          return reply.code(200).send({ success: true, message: 'Ignored stale autosave payload.' });
+        }
+
         await db.update(teamWorkspaces)
           .set({
             language,
             sourceCode,
-            cursorLine: cursorLine ?? 1,
-            cursorColumn: cursorColumn ?? 1,
-            scrollPosition: scrollPosition ?? 0,
+            cursorLine: cursorLine ?? existingWorkspace.cursorLine,
+            cursorColumn: cursorColumn ?? existingWorkspace.cursorColumn,
+            scrollPosition: scrollPosition ?? existingWorkspace.scrollPosition,
+            lastClientUpdate: incomingTime,
             updatedAt: new Date(),
           })
           .where(eq(teamWorkspaces.id, existingWorkspace.id));
@@ -100,6 +132,7 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
             cursorLine: cursorLine ?? 1,
             cursorColumn: cursorColumn ?? 1,
             scrollPosition: scrollPosition ?? 0,
+            lastClientUpdate: clientTimestamp ?? 0,
           });
       }
 
@@ -113,7 +146,10 @@ export default async function workspaceRoutes(fastify: FastifyInstance) {
   // 3. Get submission history for a problem
   fastify.get('/api/workspace/:problemId/submissions', async (request, reply) => {
     const { problemId } = request.params as { problemId: string };
-    const teamId = (request.headers['x-team-id'] as string) || 'unknown-team';
+    const teamId = extractTeamId(request);
+    if (!teamId) {
+      return reply.code(401).send({ error: 'Unauthorized', message: 'Valid JWT required.' });
+    }
 
     try {
       const history = await db.select()

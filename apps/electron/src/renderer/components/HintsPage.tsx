@@ -8,56 +8,67 @@ interface HintsPageProps {
 }
 
 // ── Landmark definitions ──────────────────────────────────────────────────────
-// Each landmark has a bounding-box polygon and the stage at which it activates.
-// Footprints derived from well-known OSM bounding boxes + small padding.
+// Each landmark has a precise building footprint polygon and the stage at which it activates.
 const LANDMARKS = [
   {
     id: 'landmark-esb',
     label: 'Empire State Building',
     activeAtStage: 1,
-    // ESB: 350 Fifth Ave, block between 33rd–34th St and 5th–6th Av
+    // ESB: 350 Fifth Ave (stepped chamfered footprint matching the building base)
     coords: [
-      [-73.9868, 40.7479],
-      [-73.9847, 40.7479],
-      [-73.9847, 40.7490],
-      [-73.9868, 40.7490],
-      [-73.9868, 40.7479],
+      [-73.98595, 40.74815],
+      [-73.98535, 40.74815],
+      [-73.98528, 40.74822],
+      [-73.98528, 40.74865],
+      [-73.98535, 40.74872],
+      [-73.98595, 40.74872],
+      [-73.98602, 40.74865],
+      [-73.98602, 40.74822],
+      [-73.98595, 40.74815],
     ],
     height: 443,    // architectural height (m), used for extrusion
     base: 0,
-    flyTo: { center: [-73.9857, 40.7484] as [number, number], zoom: 16.5, pitch: 65, bearing: -20 },
+    flyTo: { center: [-73.98565, 40.74844] as [number, number], zoom: 16.5, pitch: 60, bearing: -20 },
   },
   {
     id: 'landmark-1wtc',
     label: 'One World Trade Center',
     activeAtStage: 2,
-    // 1 WTC: west of Church St, between Fulton and Vesey
+    // 1 WTC: octagonal chamfered tower footprint
     coords: [
-      [-74.0139, 40.7128],
-      [-74.0125, 40.7128],
-      [-74.0125, 40.7141],
-      [-74.0139, 40.7141],
-      [-74.0139, 40.7128],
+      [-74.01348, 40.71274],
+      [-74.01302, 40.71274],
+      [-74.01289, 40.71287],
+      [-74.01289, 40.71317],
+      [-74.01302, 40.71330],
+      [-74.01348, 40.71330],
+      [-74.01361, 40.71317],
+      [-74.01361, 40.71287],
+      [-74.01348, 40.71274],
     ],
     height: 541,
     base: 0,
-    flyTo: { center: [-74.0132, 40.7134] as [number, number], zoom: 16.5, pitch: 65, bearing: 10 },
+    flyTo: { center: [-74.01325, 40.71302] as [number, number], zoom: 16.5, pitch: 60, bearing: 10 },
   },
   {
     id: 'landmark-chrysler',
     label: 'Chrysler Building',
     activeAtStage: 3,
-    // Chrysler: 405 Lexington Ave, between 42nd–43rd St
+    // Chrysler: 405 Lexington Ave footprint
     coords: [
-      [-73.9759, 40.7516],
-      [-73.9743, 40.7516],
-      [-73.9743, 40.7527],
-      [-73.9759, 40.7527],
-      [-73.9759, 40.7516],
+      [-73.97560, 40.75135],
+      [-73.97502, 40.75135],
+      [-73.97497, 40.75140],
+      [-73.97497, 40.75185],
+      [-73.97502, 40.75190],
+      [-73.97560, 40.75190],
+      [-73.97565, 40.75185],
+      [-73.97565, 40.75140],
+      [-73.97560, 40.75135],
     ],
     height: 318,
     base: 0,
-    flyTo: { center: [-73.9751, 40.7521] as [number, number], zoom: 16.5, pitch: 65, bearing: -10 },
+    flyTo: { center: [-73.97531, 40.75162] as [number, number], zoom: 16.5, pitch: 60, bearing: -10 },
   },
 ] as const;
 
@@ -205,7 +216,7 @@ export default function HintsPage({ hintStage }: HintsPageProps) {
         }
       });
 
-      // ── 3. Base 3D buildings (untouched — original dark purple/red scheme) ─
+      // ── 3. Base 3D buildings (dark purple/slate cybernetic style) ─────────
       map.addLayer({
         id: '3d-buildings',
         source: 'openfreemap',
@@ -215,11 +226,11 @@ export default function HintsPage({ hintStage }: HintsPageProps) {
         paint: {
           'fill-extrusion-color': [
             'interpolate', ['linear'], ['get', 'render_height'],
-            0,   '#1e1b4b',
-            50,  '#311042',
-            100, '#6b21a8',
-            150, '#b91c1c',
-            200, '#ef4444',
+            0,   '#0f172a',
+            50,  '#1e1b4b',
+            100, '#2e1065',
+            150, '#3b0764',
+            200, '#4c1d95',
           ],
           'fill-extrusion-height': [
             'interpolate', ['linear'], ['zoom'],
@@ -284,21 +295,21 @@ export default function HintsPage({ hintStage }: HintsPageProps) {
           },
         });
 
-        // Outer glow casing (wider, lower opacity — creates bloom effect)
+        // Subtle outer glow casing
         map.addLayer({
           id: `${lm.id}-casing`,
           source: lm.id,
           type: 'fill-extrusion',
           paint: {
-            'fill-extrusion-color': '#00ff88', // bright emerald
-            'fill-extrusion-height': lm.height * 2.6,
+            'fill-extrusion-color': '#34d399', // emerald accent
+            'fill-extrusion-height': lm.height * 2.52,
             'fill-extrusion-base': lm.base,
             'fill-extrusion-opacity': 0,        // starts hidden
             'fill-extrusion-vertical-gradient': true,
           },
         });
 
-        // Core glow layer (the building itself, solid emerald)
+        // Core landmark green building
         map.addLayer({
           id: `${lm.id}-glow`,
           source: lm.id,
@@ -308,7 +319,7 @@ export default function HintsPage({ hintStage }: HintsPageProps) {
             'fill-extrusion-height': lm.height * 2.5,
             'fill-extrusion-base': lm.base,
             'fill-extrusion-opacity': 0,        // starts hidden
-            'fill-extrusion-vertical-gradient': false,
+            'fill-extrusion-vertical-gradient': true,
           },
         });
       });

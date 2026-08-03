@@ -25,7 +25,7 @@ export async function reportViolation(teamId: string, type: string, io?: any) {
     await db.update(teams).set({ isDisqualified: true }).where(eq(teams.id, teamId));
     if (io) {
       io.to(`team:${teamId}`).emit('team:disqualified');
-      io.to('admin').emit('team:disqualified', { teamId });
+      io.to('admin-room').emit('team:disqualified', { teamId });
     }
   }
 

@@ -1,5 +1,5 @@
 import {
-  pgTable, pgEnum, text, integer, boolean, timestamp, json,
+  pgTable, pgEnum, text, integer, boolean, timestamp, json, bigint
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { createId } from '@paralleldrive/cuid2';
@@ -7,7 +7,7 @@ import { createId } from '@paralleldrive/cuid2';
 // ---------- Enums ----------
 export const languageEnum = pgEnum('language', ['C', 'CPP', 'PYTHON', 'JAVA']);
 export const submissionStatusEnum = pgEnum('submission_status', ['PENDING', 'JUDGING', 'DONE']);
-export const verdictEnum = pgEnum('verdict', ['AC', 'WA', 'TLE', 'MLE', 'RE', 'CE']);
+export const verdictEnum = pgEnum('verdict', ['AC', 'WA', 'TLE', 'MLE', 'RE', 'CE', 'BYPASSED']);
 export const contestStatusEnum = pgEnum('contest_status', ['NOT_STARTED', 'RUNNING', 'PAUSED', 'ENDED']);
 export const violationTypeEnum = pgEnum('violation_type', [
   'TAB_SWITCH', 'BLUR', 'FULLSCREEN_EXIT', 'DEVTOOLS_ATTEMPT', 'COPY_PASTE',
@@ -26,7 +26,7 @@ export const teams = pgTable('teams', {
   violationCount: integer('violation_count').notNull().default(0),
   isDisqualified: boolean('is_disqualified').notNull().default(false),
   isPaused: boolean('is_paused').notNull().default(false),
-  spiderSenseCharges: integer('spider_sense_charges').notNull().default(3),
+  spiderSenseCharges: integer('spider_sense_charges').notNull().default(1),
   hintStage: integer('hint_stage').notNull().default(0),
 
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -57,8 +57,8 @@ export const problems = pgTable('problems', {
 // ---------- Submission ----------
 export const submissions = pgTable('submissions', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  teamId: text('team_id').notNull().references(() => teams.id),
-  problemId: text('problem_id').notNull().references(() => problems.id),
+  teamId: text('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  problemId: text('problem_id').notNull().references(() => problems.id, { onDelete: 'cascade' }),
   language: languageEnum('language').notNull(),
   sourceCode: text('source_code').notNull(),
   status: submissionStatusEnum('status').notNull().default('PENDING'),
@@ -75,7 +75,7 @@ export const submissions = pgTable('submissions', {
 // ---------- Violation ----------
 export const violations = pgTable('violations', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  teamId: text('team_id').notNull().references(() => teams.id),
+  teamId: text('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
   type: violationTypeEnum('type').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
@@ -83,7 +83,7 @@ export const violations = pgTable('violations', {
 // ---------- Powerup ----------
 export const teamPowerups = pgTable('team_powerups', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  teamId: text('team_id').notNull().references(() => teams.id),
+  teamId: text('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
   type: powerupTypeEnum('type').notNull(),
   usedAt: timestamp('used_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -92,13 +92,15 @@ export const teamPowerups = pgTable('team_powerups', {
 // ---------- Team Workspace (Autosave Persistence) ----------
 export const teamWorkspaces = pgTable('team_workspaces', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
-  teamId: text('team_id').notNull().references(() => teams.id),
-  problemId: text('problem_id').notNull().references(() => problems.id),
+  teamId: text('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  problemId: text('problem_id').notNull().references(() => problems.id, { onDelete: 'cascade' }),
   language: languageEnum('language').notNull(),
   sourceCode: text('source_code').notNull(),
   cursorLine: integer('cursor_line').notNull().default(1),
   cursorColumn: integer('cursor_column').notNull().default(1),
   scrollPosition: integer('scroll_position').notNull().default(0),
+  lastClientUpdate: bigint('last_client_update', { mode: 'number' }).notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 

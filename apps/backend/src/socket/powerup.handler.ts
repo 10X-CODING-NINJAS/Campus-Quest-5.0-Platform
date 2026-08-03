@@ -1,9 +1,10 @@
 import { db } from '../db';
-import { teamPowerups, teams } from '../db/schema';
-import { eq, and } from 'drizzle-orm';
+import { teamPowerups, teams, contests, submissions } from '../db/schema';
+import { eq, and, inArray } from 'drizzle-orm';
+import { broadcastLeaderboard } from '../utils/leaderboard';
 
 const POWERUP_LIMITS = {
-  SPIDER_SENSE: 3,
+  SPIDER_SENSE: 1,
   WEB_FLUID: 2,
   SUIT_TECH: 2
 };
@@ -11,7 +12,7 @@ const POWERUP_LIMITS = {
 export function registerPowerupHandlers(socket: any, io: any) {
   
   // Handle a team using a powerup
-  socket.on('powerup:use', async ({ type }: { type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH' }) => {
+  socket.on('powerup:use', async ({ type, problemId }: { type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH', problemId?: string }) => {
     const teamId = socket.data?.teamId;
     if (!teamId) return;
 
@@ -20,6 +21,18 @@ export function registerPowerupHandlers(socket: any, io: any) {
       const [team] = await db.select().from(teams).where(eq(teams.id, teamId));
       if (!team) {
         socket.emit('powerup:error', { message: 'Team not found' });
+        return;
+      }
+
+      if (team.isPaused || team.isDisqualified) {
+        socket.emit('powerup:error', { message: 'Action disabled: Team is paused or disqualified.' });
+        return;
+      }
+
+      // Check contest state
+      const [contest] = await db.select().from(contests);
+      if (!contest || contest.status !== 'RUNNING') {
+        socket.emit('powerup:error', { message: 'Contest is not running.' });
         return;
       }
 
@@ -38,23 +51,100 @@ export function registerPowerupHandlers(socket: any, io: any) {
         return;
       }
 
-      if (type === 'SPIDER_SENSE' && team.spiderSenseCharges <= 0) {
-        socket.emit('powerup:error', { message: 'No Spider-Sense charges remaining in inventory' });
-        return;
+      if (type === 'SPIDER_SENSE') {
+        if (team.spiderSenseCharges <= 0) {
+          socket.emit('powerup:error', { message: 'No Spider-Sense charges remaining in inventory' });
+          return;
+        }
+
+        if (!problemId) {
+          socket.emit('powerup:error', { message: 'Mission ID required to activate Spider-Sense.' });
+          return;
+        }
+
+        if (problemId === '10-final-mission') {
+          socket.emit('powerup:error', { message: 'Spider-Sense cannot be used on the Final Mission.' });
+          return;
+        }
+
+        // Check if problem is already solved or bypassed
+        const existingSubmissions = await db.select().from(submissions).where(and(
+          eq(submissions.teamId, teamId),
+          eq(submissions.problemId, problemId),
+          inArray(submissions.verdict, ['AC', 'BYPASSED'])
+        ));
+
+        if (existingSubmissions.length > 0) {
+          socket.emit('powerup:error', { message: 'Mission is already completed or bypassed.' });
+          return;
+        }
       }
 
       // 2. Deduct inventory / persist usage
       if (type === 'SPIDER_SENSE') {
-        await db.update(teams)
-          .set({ spiderSenseCharges: team.spiderSenseCharges - 1 })
-          .where(eq(teams.id, teamId));
-      }
+        await db.transaction(async (tx) => {
+          await tx.update(teams)
+            .set({ spiderSenseCharges: team.spiderSenseCharges - 1 })
+            .where(eq(teams.id, teamId));
 
-      await db.insert(teamPowerups).values({
-        teamId,
-        type,
-        usedAt: new Date()
-      });
+          // Insert pseudo-submission to indicate bypass and unlock next question
+          await tx.insert(submissions).values({
+            teamId,
+            problemId: problemId!,
+            language: 'PYTHON', // Must match schema enum
+            sourceCode: 'SPIDER_SENSE_BYPASS',
+            verdict: 'BYPASSED',
+            runtimeMs: -1,
+            memoryKb: -1,
+            createdAt: new Date(),
+            testCaseResults: [{ index: 0, verdict: 'BYPASSED', runtimeMs: 0, memoryKb: 0 }]
+          });
+          
+          await tx.insert(teamPowerups).values({
+            teamId,
+            type,
+            usedAt: new Date(),
+          });
+        });
+        
+        socket.emit('powerup:updated', { type, remaining: team.spiderSenseCharges - 1 });
+        socket.emit('submit:result', { 
+          status: 'DONE', 
+          verdict: 'BYPASSED',
+          problemId 
+        });
+
+        const allTeamSubs = await db.select({ problemId: submissions.problemId, verdict: submissions.verdict })
+          .from(submissions)
+          .where(and(
+            eq(submissions.teamId, teamId),
+            inArray(submissions.verdict, ['AC', 'BYPASSED'])
+          ));
+        const solvedIds = Array.from(new Set(allTeamSubs.filter(s => s.verdict === 'AC').map(s => s.problemId)));
+        const bypassedIds = Array.from(new Set(allTeamSubs.filter(s => s.verdict === 'BYPASSED').map(s => s.problemId)));
+        
+        socket.emit('team:progress_updated', {
+          hintStage: team.hintStage,
+          solvedCount: solvedIds.length,
+          solvedProblemIds: solvedIds,
+          bypassedProblemIds: bypassedIds,
+        });
+        socket.to(`team:${teamId}`).emit('team:progress_updated', {
+          hintStage: team.hintStage,
+          solvedCount: solvedIds.length,
+          solvedProblemIds: solvedIds,
+          bypassedProblemIds: bypassedIds,
+        });
+
+        const ioServer = (socket as any).server || socket.conn?.server;
+        await broadcastLeaderboard(ioServer, db);
+      } else {
+        await db.insert(teamPowerups).values({
+          teamId,
+          type,
+          usedAt: new Date()
+        });
+      }
       
       // 3. Fetch updated counts
       const allUsages = await db.select()

@@ -15,6 +15,8 @@ interface Team {
   spiderSenseCharges: number;
   hintStage: number;
   solvedCount: number;
+  legitimateSolvedCount?: number;
+  bypassedCount?: number;
   latestVerdict: string;
   currentProblemId: string;
   submissionCount?: number;
@@ -44,6 +46,19 @@ interface PowerupLog {
   timestamp: string;
 }
 
+interface AnalyticsData {
+  mostSolvedQuestion: string;
+  mostFailedQuestion: string;
+  mostBypassedQuestion: string;
+  averageAttempts: number;
+  averageRuntime: number;
+  averageMemory: number;
+  spiderSenseUsage: number;
+  totalPowerupUsage: number;
+  violationCount: number;
+  fastestSolve: number;
+}
+
 interface DemoTeam {
   id: string;
   name: string;
@@ -55,14 +70,31 @@ export default function App() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [violations, setViolations] = useState<ViolationAlert[]>([]);
   const [powerups, setPowerups] = useState<PowerupLog[]>([]);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [contestStatus, setContestStatus] = useState<string>('Unknown');
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'monitoring' | 'leaderboard' | 'demo'>('monitoring');
+  const [activeTab, setActiveTab] = useState<'monitoring' | 'leaderboard' | 'analytics' | 'demo'>('monitoring');
   const [demoModeEnabled, setDemoModeEnabled] = useState(false);
   const [demoTeams, setDemoTeams] = useState<DemoTeam[]>([]);
   const [selectedDemoTeam, setSelectedDemoTeam] = useState<string>('');
   const [demoStatus, setDemoStatus] = useState<string | null>(null);
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
+
+  const [adminToken, setAdminToken] = useState<string | null>(
+    // M2: Restore from sessionStorage so admin survives browser refresh
+    () => sessionStorage.getItem('cq_admin_token')
+  );
+  const [loginInput, setLoginInput] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // Setup Axios globally when token is set
+  useEffect(() => {
+    if (adminToken) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${adminToken}`;
+      sessionStorage.setItem('cq_admin_token', adminToken); // M2: persist
+    }
+  }, [adminToken]);
 
   // Fetch initial state
   const fetchData = useCallback(async () => {
@@ -71,27 +103,41 @@ export default function App() {
       setTeams(teamsRes.data);
       const subsRes = await axios.get(`http://localhost:3001/admin/submissions`);
       setSubmissions(subsRes.data);
+      const analyticsRes = await axios.get(`http://localhost:3001/admin/analytics`);
+      setAnalytics(analyticsRes.data);
+      const statusRes = await axios.get(`http://localhost:3001/admin/contest-status`);
+      setContestStatus(statusRes.data?.status || 'NOT_STARTED');
     } catch (err: any) {
       console.error('Failed to load initial admin data:', err);
     }
   }, []);
 
   useEffect(() => {
+    if (!adminToken) return;
     fetchData();
 
     // Check demo mode status
     axios.get(`${DEMO_URL}/status`).then(res => {
       setDemoModeEnabled(res.data.enabled);
-      if (res.data.enabled) {
-        axios.get(`${DEMO_URL}/teams`).then(r => {
-          setDemoTeams(r.data);
-          if (r.data.length > 0) setSelectedDemoTeam(r.data[0].id);
-        }).catch(() => {});
-      }
     }).catch(() => {});
 
+    // Load both demo teams AND test teams into the selector
+    Promise.all([
+      axios.get(`${DEMO_URL}/teams`).catch(() => ({ data: [] })),
+      axios.get('http://localhost:3001/api/test-teams').catch(() => ({ data: [] })),
+    ]).then(([demoRes, testRes]) => {
+      // Test teams come first (these are the real login accounts)
+      const testList = (testRes.data as any[]).map((t: any) => ({ id: t.id, name: `${t.name} (test)`, email: '' }));
+      const demoList = (demoRes.data as DemoTeam[]);
+      const merged = [...testList, ...demoList];
+      setDemoTeams(merged);
+      if (merged.length > 0) setSelectedDemoTeam(merged[0].id);
+    });
+
     // Connect admin to live WebSocket updates
-    const socket = io(SOCKET_URL);
+    const socket = io(SOCKET_URL, {
+      auth: { adminSecret: adminToken }
+    });
 
     socket.on('connect', () => {
       console.log('[Admin Socket] Connected to stream');
@@ -122,7 +168,56 @@ export default function App() {
     socket.on('contest:ended', () => setContestStatus('ENDED'));
 
     return () => { socket.disconnect(); };
-  }, [fetchData]);
+  }, [fetchData, adminToken]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const secret = loginInput.trim();
+    if (!secret) {
+      setLoginError('Secret required');
+      return;
+    }
+    setLoginLoading(true);
+    setLoginError(null);
+    try {
+      // H5: Validate secret against the backend — reject before setting token
+      await axios.get(`${API_URL}/contest-status`, {
+        headers: { Authorization: `Bearer ${secret}` }
+      });
+      setAdminToken(secret);
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        setLoginError('Invalid admin secret. Access denied.');
+      } else {
+        setLoginError('Backend unreachable — is the server running?');
+      }
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  if (!adminToken) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
+        <form onSubmit={handleLogin} className="bg-gray-800 p-8 rounded-lg shadow-xl w-96">
+          <h2 className="text-2xl font-bold text-red-500 mb-6 text-center">Admin Access</h2>
+          <div className="mb-4">
+            <label className="block text-gray-400 text-sm mb-2">Admin Secret</label>
+            <input
+              type="password"
+              className="w-full bg-gray-700 text-white rounded px-3 py-2"
+              value={loginInput}
+              onChange={(e) => setLoginInput(e.target.value)}
+            />
+          </div>
+          {loginError && <div className="text-red-500 text-sm mb-4">{loginError}</div>}
+          <button type="submit" disabled={loginLoading} className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white py-2 rounded">
+            {loginLoading ? 'Verifying…' : 'Login'}
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   const handleAction = async (action: 'start' | 'pause' | 'resume' | 'stop') => {
     try {
@@ -249,24 +344,23 @@ export default function App() {
 
         {/* Navigation Tabs */}
         <div className="flex gap-4 border-b-2 border-slate-700 pb-2">
-          {(['monitoring', 'leaderboard'] as const).map(tab => (
+          {(['monitoring', 'leaderboard', 'analytics'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 font-mono text-xs font-bold uppercase border-2 transition-all ${activeTab === tab ? 'bg-red-500 text-white border-black shadow-[2px_2px_0_#000]' : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'}`}
             >
-              {tab === 'monitoring' ? 'Operations Monitoring' : 'Championship Leaderboard'}
+              {tab === 'monitoring' ? 'Operations Monitoring' : tab === 'leaderboard' ? 'Championship Leaderboard' : 'Analytics & Telemetry'}
             </button>
           ))}
-          {demoModeEnabled && (
-            <button
-              onClick={() => setActiveTab('demo')}
-              className={`px-4 py-2 font-mono text-xs font-bold uppercase border-2 transition-all ${activeTab === 'demo' ? 'bg-yellow-500 text-black border-black shadow-[2px_2px_0_#000]' : 'bg-yellow-900/40 text-yellow-400 border-yellow-700 hover:text-yellow-300'}`}
-              id="demo-controls-tab"
-            >
-              ⚡ DEMO CONTROLS
-            </button>
-          )}
+        {/* Demo Controls tab always shown */}
+          <button
+            onClick={() => setActiveTab('demo')}
+            className={`px-4 py-2 font-mono text-xs font-bold uppercase border-2 transition-all ${activeTab === 'demo' ? 'bg-yellow-500 text-black border-black shadow-[2px_2px_0_#000]' : 'bg-yellow-900/40 text-yellow-400 border-yellow-700 hover:text-yellow-300'}`}
+            id="demo-controls-tab"
+          >
+            ⚡ DEMO CONTROLS
+          </button>
         </div>
 
         {activeTab === 'monitoring' && (
@@ -384,7 +478,7 @@ export default function App() {
                   <tr className="border-b-2 border-slate-700 text-slate-400 text-left">
                     <th className="pb-3 font-bold uppercase">Rank</th>
                     <th className="pb-3 font-bold uppercase">Team Name</th>
-                    <th className="pb-3 font-bold uppercase text-center">Solved</th>
+                    <th className="pb-3 font-bold uppercase text-center">Solves / Bypasses</th>
                     <th className="pb-3 font-bold uppercase text-center">Submissions</th>
                     <th className="pb-3 font-bold uppercase text-center">Penalty</th>
                     <th className="pb-3 font-bold uppercase text-right">Current Activity</th>
@@ -398,7 +492,11 @@ export default function App() {
                       <tr key={t.id} className="border-b border-slate-800/60 hover:bg-slate-900/40 transition-colors">
                         <td className="py-3.5 font-black text-slate-400 text-sm">#{idx + 1}</td>
                         <td className="py-3.5 font-bold text-white text-sm">{t.name}</td>
-                        <td className="py-3.5 text-center font-black text-green-400 text-sm">{t.solvedCount}</td>
+                        <td className="py-3.5 text-center font-black text-sm">
+                          <span className="text-green-400">{t.legitimateSolvedCount ?? t.solvedCount}</span>
+                          <span className="text-slate-500 mx-1">/</span>
+                          <span className="text-orange-400">{t.bypassedCount ?? 0}</span>
+                        </td>
                         <td className="py-3.5 text-center text-slate-300">{t.submissionCount || 0}</td>
                         <td className="py-3.5 text-center text-red-400 font-bold">{t.penalty || 0} pts</td>
                         <td className="py-3.5 text-right font-semibold text-slate-400">
@@ -414,9 +512,97 @@ export default function App() {
           </div>
         )}
 
+        {activeTab === 'analytics' && analytics && (
+          <div className="bg-slate-800 border-2 border-slate-700 p-6 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+            <h3 className="text-sm font-black tracking-widest text-slate-300 uppercase mb-4">CONTEST ANALYTICS & TELEMETRY</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              
+              {/* Question Stats */}
+              <div className="bg-slate-900 border border-slate-700 p-4 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 border-b border-slate-700 pb-1">Missions</h4>
+                <div className="space-y-3 font-mono text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Most Solved</span>
+                    <span className="text-green-400 font-bold truncate max-w-[120px] ml-2">{analytics.mostSolvedQuestion}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Most Bypassed</span>
+                    <span className="text-yellow-400 font-bold truncate max-w-[120px] ml-2">{analytics.mostBypassedQuestion}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Most Failed</span>
+                    <span className="text-red-400 font-bold truncate max-w-[120px] ml-2">{analytics.mostFailedQuestion}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance Stats */}
+              <div className="bg-slate-900 border border-slate-700 p-4 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 border-b border-slate-700 pb-1">Performance</h4>
+                <div className="space-y-3 font-mono text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Avg Runtime</span>
+                    <span className="text-sky-400 font-bold">{analytics.averageRuntime} ms</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Avg Memory</span>
+                    <span className="text-purple-400 font-bold">{analytics.averageMemory} KB</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Fastest Solve</span>
+                    <span className="text-white font-bold">{analytics.fastestSolve} ms</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Engagement Stats */}
+              <div className="bg-slate-900 border border-slate-700 p-4 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 border-b border-slate-700 pb-1">Engagement</h4>
+                <div className="space-y-3 font-mono text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Avg Attempts</span>
+                    <span className="text-white font-bold">{analytics.averageAttempts}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Spider-Sense Used</span>
+                    <span className="text-yellow-400 font-bold">{analytics.spiderSenseUsage}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Total Powerups</span>
+                    <span className="text-sky-400 font-bold">{analytics.totalPowerupUsage}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Security Stats */}
+              <div className="bg-slate-900 border border-slate-700 p-4 shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex flex-col justify-between">
+                <div>
+                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 border-b border-slate-700 pb-1">Security</h4>
+                  <div className="font-mono text-xs text-center py-2">
+                    <div className="text-slate-400 uppercase mb-1">Cheat Alerts</div>
+                    <div className={`text-2xl font-black ${analytics.violationCount > 10 ? 'text-red-500 animate-pulse' : 'text-slate-300'}`}>{analytics.violationCount}</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
         {/* ── DEMO CONTROLS TAB ── */}
-        {activeTab === 'demo' && demoModeEnabled && (
+        {activeTab === 'demo' && (
           <div className="space-y-6">
+
+            {/* Demo mode disabled banner */}
+            {!demoModeEnabled && (
+              <div className="border-2 border-amber-600 bg-amber-950/30 p-5 font-mono text-sm text-amber-400">
+                <div className="font-black uppercase tracking-widest mb-2">⚠️ DEMO MODE IS DISABLED</div>
+                <div className="text-xs text-amber-300">
+                  Set <code className="bg-black/40 px-1.5 py-0.5 rounded">DEMO_MODE=true</code> in{' '}
+                  <code className="bg-black/40 px-1.5 py-0.5 rounded">apps/backend/.env</code> then restart the backend.
+                </div>
+              </div>
+            )}
 
             {/* Status bar */}
             {demoStatus && (
