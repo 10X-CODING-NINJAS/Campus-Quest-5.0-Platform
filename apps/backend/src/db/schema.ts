@@ -16,6 +16,10 @@ export const powerupTypeEnum = pgEnum('powerup_type', [
   'SPIDER_SENSE', 'WEB_FLUID', 'SUIT_TECH',
 ]);
 
+export const helpRequestStatusEnum = pgEnum('help_request_status', [
+  'PENDING', 'ANSWERED', 'EXPIRED',
+]);
+
 // ---------- Team ----------
 export const teams = pgTable('teams', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
@@ -28,6 +32,7 @@ export const teams = pgTable('teams', {
   isPaused: boolean('is_paused').notNull().default(false),
   spiderSenseCharges: integer('spider_sense_charges').notNull().default(1),
   hintStage: integer('hint_stage').notNull().default(0),
+  teamFrozenUntil: timestamp('team_frozen_until'),
 
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
@@ -104,12 +109,25 @@ export const teamWorkspaces = pgTable('team_workspaces', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// ---------- Help Requests (Suit Tech - Spider-Comms) ----------
+export const helpRequests = pgTable('help_requests', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  teamId: text('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  problemId: text('problem_id').notNull().references(() => problems.id, { onDelete: 'cascade' }),
+  status: helpRequestStatusEnum('status').notNull().default('PENDING'),
+  hint: text('hint'),
+  answeredBy: text('answered_by'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  answeredAt: timestamp('answered_at'),
+});
+
 // ---------- Relations ----------
 export const teamsRelations = relations(teams, ({ many }) => ({
   submissions: many(submissions),
   violations: many(violations),
   powerups: many(teamPowerups),
   workspaces: many(teamWorkspaces),
+  helpRequests: many(helpRequests),
 }));
 
 export const submissionsRelations = relations(submissions, ({ one }) => ({
@@ -129,3 +147,9 @@ export const teamWorkspacesRelations = relations(teamWorkspaces, ({ one }) => ({
   team: one(teams, { fields: [teamWorkspaces.teamId], references: [teams.id] }),
   problem: one(problems, { fields: [teamWorkspaces.problemId], references: [problems.id] }),
 }));
+
+export const helpRequestsRelations = relations(helpRequests, ({ one }) => ({
+  team: one(teams, { fields: [helpRequests.teamId], references: [teams.id] }),
+  problem: one(problems, { fields: [helpRequests.problemId], references: [problems.id] }),
+}));
+

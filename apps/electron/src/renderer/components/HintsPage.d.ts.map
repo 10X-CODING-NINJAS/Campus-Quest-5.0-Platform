@@ -1,1 +1,1 @@
-{"version":3,"file":"HintsPage.d.ts","sourceRoot":"","sources":["HintsPage.tsx"],"names":[],"mappings":"AAEA,OAAO,kCAAkC,CAAC;AAG1C,UAAU,cAAc;IACtB,SAAS,EAAE,MAAM,CAAC;CACnB;AA4ED,MAAM,CAAC,OAAO,UAAU,SAAS,CAAC,EAAE,SAAS,EAAE,EAAE,cAAc,+BAigB9D"}
+{"version":3,"file":"HintsPage.d.ts","sourceRoot":"","sources":["HintsPage.tsx"],"names":[],"mappings":"AAEA,OAAO,kCAAkC,CAAC;AAG1C,UAAU,cAAc;IACtB,SAAS,EAAE,MAAM,CAAC;IAClB,aAAa,CAAC,EAAE,GAAG,EAAE,CAAC;CACvB;AA4ED,MAAM,CAAC,OAAO,UAAU,SAAS,CAAC,EAAE,SAAS,EAAE,EAAE,cAAc,+BAigB9D"}

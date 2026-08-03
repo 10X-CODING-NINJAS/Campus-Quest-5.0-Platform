@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { teamPowerups, teams, contests, submissions } from '../db/schema';
+import { teamPowerups, teams, contests, submissions, helpRequests, problems } from '../db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { broadcastLeaderboard } from '../utils/leaderboard';
 
@@ -78,20 +78,16 @@ export function registerPowerupHandlers(socket: any, io: any) {
           socket.emit('powerup:error', { message: 'Mission is already completed or bypassed.' });
           return;
         }
-      }
 
-      // 2. Deduct inventory / persist usage
-      if (type === 'SPIDER_SENSE') {
         await db.transaction(async (tx) => {
           await tx.update(teams)
             .set({ spiderSenseCharges: team.spiderSenseCharges - 1 })
             .where(eq(teams.id, teamId));
 
-          // Insert pseudo-submission to indicate bypass and unlock next question
           await tx.insert(submissions).values({
             teamId,
             problemId: problemId!,
-            language: 'PYTHON', // Must match schema enum
+            language: 'PYTHON',
             sourceCode: 'SPIDER_SENSE_BYPASS',
             verdict: 'BYPASSED',
             runtimeMs: -1,
@@ -138,15 +134,105 @@ export function registerPowerupHandlers(socket: any, io: any) {
 
         const ioServer = (socket as any).server || socket.conn?.server;
         await broadcastLeaderboard(ioServer, db);
-      } else {
-        await db.insert(teamPowerups).values({
+      } else if (type === 'WEB_FLUID') {
+        // Time Freeze Mechanic (60 seconds)
+        const now = new Date();
+        if (team.teamFrozenUntil && new Date(team.teamFrozenUntil) > now) {
+          socket.emit('powerup:error', { message: 'Web-Fluid Time Freeze is already active for your team.' });
+          return;
+        }
+
+        const frozenUntil = new Date(now.getTime() + 60000);
+
+        await db.transaction(async (tx) => {
+          await tx.update(teams)
+            .set({ teamFrozenUntil: frozenUntil })
+            .where(eq(teams.id, teamId));
+
+          await tx.insert(teamPowerups).values({
+            teamId,
+            type,
+            usedAt: now,
+          });
+        });
+
+        // Broadcast timer freeze to contestant(s)
+        const timerPayload = {
+          frozenUntil: frozenUntil.toISOString(),
+          durationMs: 60000,
+        };
+
+        socket.emit('team:timer_frozen', timerPayload);
+        socket.to(`team:${teamId}`).emit('team:timer_frozen', timerPayload);
+
+        // Schedule unfreeze notification
+        setTimeout(() => {
+          socket.emit('team:timer_resumed', { teamId });
+          socket.to(`team:${teamId}`).emit('team:timer_resumed', { teamId });
+        }, 60000);
+
+      } else if (type === 'SUIT_TECH') {
+        // Spider-Comms Tactical Assistance Request
+        if (!problemId) {
+          socket.emit('powerup:error', { message: 'Mission ID required to request Tactical Assistance.' });
+          return;
+        }
+
+        // Check if a pending request already exists for this team
+        const pending = await db.select()
+          .from(helpRequests)
+          .where(and(
+            eq(helpRequests.teamId, teamId),
+            eq(helpRequests.status, 'PENDING')
+          ));
+
+        if (pending.length > 0) {
+          socket.emit('powerup:error', { message: 'A Tactical Assistance request is already pending for your team.' });
+          return;
+        }
+
+        let newReqId = '';
+        await db.transaction(async (tx) => {
+          const [inserted] = await tx.insert(helpRequests).values({
+            teamId,
+            problemId: problemId!,
+            status: 'PENDING',
+            createdAt: new Date(),
+          }).returning();
+
+          newReqId = inserted.id;
+
+          await tx.insert(teamPowerups).values({
+            teamId,
+            type,
+            usedAt: new Date(),
+          });
+        });
+
+        // Fetch problem info for admin broadcast
+        const [problem] = await db.select().from(problems).where(eq(problems.id, problemId));
+
+        // Emit admin notification
+        io.to('admin-room').emit('admin:hint_request', {
+          id: newReqId,
           teamId,
-          type,
-          usedAt: new Date()
+          teamName: team.name,
+          problemId,
+          problemTitle: problem?.title || problemId,
+          status: 'PENDING',
+          createdAt: new Date().toISOString(),
+          remainingSuitTech: 2 - (usages.length + 1),
+        });
+
+        socket.emit('suit_tech:request_created', {
+          id: newReqId,
+          problemId,
+          status: 'PENDING',
+          createdAt: new Date().toISOString(),
         });
       }
-      
-      // 3. Fetch updated counts
+
+      // Fetch updated powerup counts
       const allUsages = await db.select()
         .from(teamPowerups)
         .where(eq(teamPowerups.teamId, teamId));
@@ -157,12 +243,64 @@ export function registerPowerupHandlers(socket: any, io: any) {
         SUIT_TECH: allUsages.filter(p => p.type === 'SUIT_TECH').length
       };
 
-      // 4. Broadcast updates to team and admin
+      // Broadcast updates to team and admin log
       socket.emit('powerup:updated', counts);
-      io.to('admin-room').emit('admin:powerup_used', { teamId, type, counts });
+      socket.to(`team:${teamId}`).emit('powerup:updated', counts);
+
+      io.to('admin-room').emit('admin:powerup_used', {
+        teamId,
+        teamName: team.name,
+        type,
+        counts,
+        timestamp: new Date().toISOString(),
+        freezeDurationMs: type === 'WEB_FLUID' ? 60000 : undefined,
+      });
+
     } catch (err: any) {
       console.error('[Powerup Error]:', err.message);
       socket.emit('powerup:error', { message: 'Failed to process powerup usage' });
+    }
+  });
+
+  // Admin sending a hint response for Suit Tech request
+  socket.on('admin:send_hint', async ({ requestId, hint, adminName }: { requestId: string; hint: string; adminName?: string }) => {
+    try {
+      const [req] = await db.select().from(helpRequests).where(eq(helpRequests.id, requestId));
+      if (!req || req.status !== 'PENDING') {
+        socket.emit('admin:error', { message: 'Request not found or already answered.' });
+        return;
+      }
+
+      const now = new Date();
+      const answeredBy = adminName || 'Spider-Vision Admin';
+
+      await db.update(helpRequests)
+        .set({
+          status: 'ANSWERED',
+          hint,
+          answeredBy,
+          answeredAt: now,
+        })
+        .where(eq(helpRequests.id, requestId));
+
+      const payload = {
+        requestId,
+        teamId: req.teamId,
+        problemId: req.problemId,
+        hint,
+        answeredBy,
+        answeredAt: now.toISOString(),
+      };
+
+      // Emit to contestant socket & team room
+      io.to(`team:${req.teamId}`).emit('team:hint_response', payload);
+      io.emit('team:hint_response', payload); // global dispatch check
+
+      // Broadcast to admin room
+      io.to('admin-room').emit('admin:hint_answered', payload);
+    } catch (err: any) {
+      console.error('[Admin Hint Response Error]:', err.message);
+      socket.emit('admin:error', { message: 'Failed to send hint.' });
     }
   });
 }

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../db';
-import { teams, contests, problems, submissions, teamPowerups, violations } from '../db/schema';
+import { teams, contests, problems, submissions, teamPowerups, violations, helpRequests } from '../db/schema';
 import { eq, desc, and } from 'drizzle-orm';
 import { calculateLeaderboard } from '../utils/leaderboard';
 import fs from 'fs/promises';
@@ -298,18 +298,41 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     };
   });
 
+    // 9b. Help Requests (Tactical Assistance Queue) endpoint
+    fastify.get('/admin/help-requests', async (_request, _reply) => {
+      const allRequests = await db.select({
+        id: helpRequests.id,
+        teamId: helpRequests.teamId,
+        teamName: teams.name,
+        problemId: helpRequests.problemId,
+        problemTitle: problems.title,
+        status: helpRequests.status,
+        hint: helpRequests.hint,
+        answeredBy: helpRequests.answeredBy,
+        createdAt: helpRequests.createdAt,
+        answeredAt: helpRequests.answeredAt,
+      })
+      .from(helpRequests)
+      .leftJoin(teams, eq(helpRequests.teamId, teams.id))
+      .leftJoin(problems, eq(helpRequests.problemId, problems.id))
+      .orderBy(desc(helpRequests.createdAt));
+
+      return allRequests;
+    });
+
   // 9. Analytics endpoint
   fastify.get('/admin/analytics', async (_request, _reply) => {
     const allSubs = await db.select().from(submissions);
     const allPowerups = await db.select().from(teamPowerups);
     const allViolations = await db.select().from(violations);
     const allTeams = await db.select().from(teams);
+    const allHelpReqs = await db.select().from(helpRequests);
 
-    const problemStats = new Map<string, { attempts: number, solved: number, bypassed: number, failed: number }>();
+    const problemStats = new Map<string, { attempts: number, solved: number, bypassed: number, failed: number, helpRequests: number }>();
     
     for (const sub of allSubs) {
       if (!problemStats.has(sub.problemId)) {
-        problemStats.set(sub.problemId, { attempts: 0, solved: 0, bypassed: 0, failed: 0 });
+        problemStats.set(sub.problemId, { attempts: 0, solved: 0, bypassed: 0, failed: 0, helpRequests: 0 });
       }
       const stat = problemStats.get(sub.problemId)!;
       stat.attempts++;
@@ -318,17 +341,27 @@ export default async function adminRoutes(fastify: FastifyInstance) {
       else stat.failed++;
     }
 
+    for (const req of allHelpReqs) {
+      if (!problemStats.has(req.problemId)) {
+        problemStats.set(req.problemId, { attempts: 0, solved: 0, bypassed: 0, failed: 0, helpRequests: 0 });
+      }
+      problemStats.get(req.problemId)!.helpRequests++;
+    }
+
     let mostSolvedId = 'None';
     let maxSolved = -1;
     let mostFailedId = 'None';
     let maxFailed = -1;
     let mostBypassedId = 'None';
     let maxBypassed = -1;
+    let mostRequestedId = 'None';
+    let maxRequested = -1;
 
     for (const [pId, stat] of problemStats.entries()) {
       if (stat.solved > maxSolved) { maxSolved = stat.solved; mostSolvedId = pId; }
       if (stat.failed > maxFailed) { maxFailed = stat.failed; mostFailedId = pId; }
       if (stat.bypassed > maxBypassed) { maxBypassed = stat.bypassed; mostBypassedId = pId; }
+      if (stat.helpRequests > maxRequested) { maxRequested = stat.helpRequests; mostRequestedId = pId; }
     }
 
     let totalRuntime = 0;
@@ -350,8 +383,25 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     const avgAttempts = allTeams.length ? +(allSubs.length / allTeams.length).toFixed(1) : 0;
     
     const spiderSenseUsage = allPowerups.filter(p => p.type === 'SPIDER_SENSE').length;
+    const webFluidUsage = allPowerups.filter(p => p.type === 'WEB_FLUID').length;
+    const suitTechUsage = allPowerups.filter(p => p.type === 'SUIT_TECH').length;
     const totalPowerupUsage = allPowerups.length;
     const violationCount = allViolations.length;
+
+    // Response times for help requests
+    let totalResponseMs = 0;
+    let answeredCount = 0;
+    for (const req of allHelpReqs) {
+      if (req.status === 'ANSWERED' && req.createdAt && req.answeredAt) {
+        totalResponseMs += (new Date(req.answeredAt).getTime() - new Date(req.createdAt).getTime());
+        answeredCount++;
+      }
+    }
+    const averageResponseTimeSec = answeredCount ? Math.round(totalResponseMs / (answeredCount * 1000)) : 0;
+
+    // Total Suit Tech capacity is 2 per team
+    const totalPossibleSuitTech = allTeams.length * 2;
+    const unusedSuitTech = Math.max(0, totalPossibleSuitTech - suitTechUsage);
 
     // Fastest Solve
     let fastestSolve = -1;
@@ -367,13 +417,20 @@ export default async function adminRoutes(fastify: FastifyInstance) {
       mostSolvedQuestion: mostSolvedId,
       mostFailedQuestion: mostFailedId,
       mostBypassedQuestion: mostBypassedId,
+      mostRequestedMission: mostRequestedId,
       averageAttempts: avgAttempts,
       averageRuntime: avgRuntime,
       averageMemory: avgMemory,
       spiderSenseUsage,
+      webFluidUsage,
+      suitTechUsage,
       totalPowerupUsage,
       violationCount,
-      fastestSolve: fastestSolve === -1 ? 0 : fastestSolve
+      fastestSolve: fastestSolve === -1 ? 0 : fastestSolve,
+      totalHintRequests: allHelpReqs.length,
+      hintsSent: answeredCount,
+      averageResponseTimeSec,
+      unusedSuitTech,
     };
   });
 }

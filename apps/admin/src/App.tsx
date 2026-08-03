@@ -40,23 +40,45 @@ interface ViolationAlert {
   violationCount?: number;
 }
 
+interface HelpRequest {
+  id: string;
+  teamId: string;
+  teamName?: string;
+  problemId: string;
+  problemTitle?: string;
+  status: 'PENDING' | 'ANSWERED' | 'EXPIRED';
+  hint?: string;
+  answeredBy?: string;
+  createdAt: string;
+  answeredAt?: string;
+  remainingSuitTech?: number;
+}
+
 interface PowerupLog {
   teamId: string;
   type: string;
   timestamp: string;
+  freezeDurationMs?: number;
 }
 
 interface AnalyticsData {
   mostSolvedQuestion: string;
   mostFailedQuestion: string;
   mostBypassedQuestion: string;
+  mostRequestedMission?: string;
   averageAttempts: number;
   averageRuntime: number;
   averageMemory: number;
   spiderSenseUsage: number;
+  webFluidUsage?: number;
+  suitTechUsage?: number;
   totalPowerupUsage: number;
   violationCount: number;
   fastestSolve: number;
+  totalHintRequests?: number;
+  hintsSent?: number;
+  averageResponseTimeSec?: number;
+  unusedSuitTech?: number;
 }
 
 interface DemoTeam {
@@ -70,10 +92,12 @@ export default function App() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [violations, setViolations] = useState<ViolationAlert[]>([]);
   const [powerups, setPowerups] = useState<PowerupLog[]>([]);
+  const [helpRequests, setHelpRequests] = useState<HelpRequest[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [contestStatus, setContestStatus] = useState<string>('Unknown');
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'monitoring' | 'leaderboard' | 'analytics' | 'demo'>('monitoring');
+  const [activeTab, setActiveTab] = useState<'monitoring' | 'leaderboard' | 'tactical' | 'analytics' | 'demo'>('monitoring');
+  const [hintInputs, setHintInputs] = useState<Record<string, string>>({});
   const [demoModeEnabled, setDemoModeEnabled] = useState(false);
   const [demoTeams, setDemoTeams] = useState<DemoTeam[]>([]);
   const [selectedDemoTeam, setSelectedDemoTeam] = useState<string>('');
@@ -103,6 +127,8 @@ export default function App() {
       setTeams(teamsRes.data);
       const subsRes = await axios.get(`http://localhost:3001/admin/submissions`);
       setSubmissions(subsRes.data);
+      const helpReqRes = await axios.get(`http://localhost:3001/admin/help-requests`).catch(() => ({ data: [] }));
+      setHelpRequests(helpReqRes.data);
       const analyticsRes = await axios.get(`http://localhost:3001/admin/analytics`);
       setAnalytics(analyticsRes.data);
       const statusRes = await axios.get(`http://localhost:3001/admin/contest-status`);
@@ -139,6 +165,8 @@ export default function App() {
       auth: { adminSecret: adminToken }
     });
 
+    (window as any).adminSocket = socket;
+
     socket.on('connect', () => {
       console.log('[Admin Socket] Connected to stream');
       socket.emit('join:admin');
@@ -154,9 +182,19 @@ export default function App() {
 
     socket.on('admin:powerup_used', (usage: any) => {
       setPowerups(prev => [
-        { teamId: usage.teamId, type: usage.type, timestamp: new Date().toLocaleTimeString() },
+        { teamId: usage.teamId, type: usage.type, timestamp: new Date().toLocaleTimeString(), freezeDurationMs: usage.freezeDurationMs },
         ...prev.slice(0, 49),
       ]);
+      fetchData();
+    });
+
+    socket.on('admin:hint_request', (req: any) => {
+      setHelpRequests(prev => [req, ...prev.filter(r => r.id !== req.id)]);
+      fetchData();
+    });
+
+    socket.on('admin:hint_answered', (data: any) => {
+      setHelpRequests(prev => prev.map(r => r.id === data.requestId ? { ...r, status: 'ANSWERED', hint: data.hint, answeredBy: data.answeredBy, answeredAt: data.answeredAt } : r));
       fetchData();
     });
 
@@ -344,19 +382,32 @@ export default function App() {
 
         {/* Navigation Tabs */}
         <div className="flex gap-4 border-b-2 border-slate-700 pb-2">
-          {(['monitoring', 'leaderboard', 'analytics'] as const).map(tab => (
+          {[
+            { id: 'monitoring', label: 'Operations Monitoring' },
+            { id: 'leaderboard', label: 'Championship Leaderboard' },
+            { id: 'tactical', label: `Tactical Assistance (${helpRequests.filter(r => r.status === 'PENDING').length})` },
+            { id: 'analytics', label: 'Analytics & Telemetry' },
+          ].map(tab => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 font-mono text-xs font-bold uppercase border-2 transition-all ${activeTab === tab ? 'bg-red-500 text-white border-black shadow-[2px_2px_0_#000]' : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'}`}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`px-4 py-2 font-mono text-xs font-bold uppercase border-2 transition-all ${
+                activeTab === tab.id
+                  ? 'bg-red-500 text-white border-black shadow-[2px_2px_0_#000]'
+                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+              }`}
             >
-              {tab === 'monitoring' ? 'Operations Monitoring' : tab === 'leaderboard' ? 'Championship Leaderboard' : 'Analytics & Telemetry'}
+              {tab.label}
             </button>
           ))}
-        {/* Demo Controls tab always shown */}
+          {/* Demo Controls tab always shown */}
           <button
             onClick={() => setActiveTab('demo')}
-            className={`px-4 py-2 font-mono text-xs font-bold uppercase border-2 transition-all ${activeTab === 'demo' ? 'bg-yellow-500 text-black border-black shadow-[2px_2px_0_#000]' : 'bg-yellow-900/40 text-yellow-400 border-yellow-700 hover:text-yellow-300'}`}
+            className={`px-4 py-2 font-mono text-xs font-bold uppercase border-2 transition-all ${
+              activeTab === 'demo'
+                ? 'bg-yellow-500 text-black border-black shadow-[2px_2px_0_#000]'
+                : 'bg-yellow-900/40 text-yellow-400 border-yellow-700 hover:text-yellow-300'
+            }`}
             id="demo-controls-tab"
           >
             ⚡ DEMO CONTROLS
@@ -512,6 +563,112 @@ export default function App() {
           </div>
         )}
 
+        {activeTab === 'tactical' && (
+          <div className="bg-slate-800 border-2 border-slate-700 p-6 shadow-[4px_4px_0_0_rgba(0,0,0,1)] space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-700 pb-3">
+              <div>
+                <h3 className="text-base font-black tracking-widest text-sky-400 uppercase">
+                  📡 TACTICAL ASSISTANCE QUEUE (SPIDER-COMMS)
+                </h3>
+                <p className="font-mono text-xs text-slate-400 mt-0.5">
+                  Direct Organizer-to-Contestant Hint Relay & Intel Dispatch
+                </p>
+              </div>
+              <div className="flex items-center gap-3 font-mono text-xs font-bold">
+                <span className="bg-amber-950 border border-amber-500 text-amber-300 px-3 py-1">
+                  PENDING QUEUE: {helpRequests.filter(r => r.status === 'PENDING').length}
+                </span>
+                <span className="bg-green-950 border border-green-500 text-green-300 px-3 py-1">
+                  ANSWERED: {helpRequests.filter(r => r.status === 'ANSWERED').length}
+                </span>
+              </div>
+            </div>
+
+            {helpRequests.length === 0 ? (
+              <div className="bg-slate-900 border border-slate-700 p-8 text-center text-slate-400 font-mono text-xs">
+                No tactical assistance requests received yet.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {helpRequests.map((req) => (
+                  <div
+                    key={req.id}
+                    className={`border-2 p-5 bg-slate-900 shadow-[3px_3px_0_0_rgba(0,0,0,1)] flex flex-col gap-3 ${
+                      req.status === 'PENDING' ? 'border-sky-500 bg-sky-950/20' : 'border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <div className="flex items-center gap-3 font-mono">
+                        <span className="text-white font-bold text-sm">{req.teamName || req.teamId}</span>
+                        <span className="bg-slate-800 text-sky-300 border border-sky-500/40 text-[10px] px-2 py-0.5 font-bold uppercase">
+                          TARGET MISSION: {req.problemTitle || req.problemId}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 font-mono text-xs">
+                        <span className="text-slate-400">
+                          {req.createdAt ? new Date(req.createdAt).toLocaleTimeString() : 'Just now'}
+                        </span>
+                        <span
+                          className={`font-bold px-2 py-0.5 border text-[10px] uppercase ${
+                            req.status === 'PENDING'
+                              ? 'bg-amber-900 border-amber-500 text-amber-200 animate-pulse'
+                              : 'bg-green-900 border-green-500 text-green-200'
+                          }`}
+                        >
+                          {req.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    {req.status === 'PENDING' ? (
+                      <div className="space-y-3 pt-1">
+                        <div className="font-mono text-xs text-amber-300">
+                          💬 Contestant requested tactical advice for <span className="font-bold text-white">{req.problemTitle || req.problemId}</span>. Type response below:
+                        </div>
+                        <div className="flex gap-3">
+                          <input
+                            type="text"
+                            placeholder="Type tactical hint or code advice..."
+                            value={hintInputs[req.id] || ''}
+                            onChange={(e) => setHintInputs(prev => ({ ...prev, [req.id]: e.target.value }))}
+                            className="flex-1 bg-slate-950 border border-slate-700 p-2.5 text-xs text-white font-mono focus:outline-none focus:border-sky-400"
+                          />
+                          <button
+                            onClick={() => {
+                              const text = hintInputs[req.id]?.trim();
+                              if (!text) return;
+                              const socket = (window as any).adminSocket;
+                              if (socket) {
+                                socket.emit('admin:send_hint', {
+                                  requestId: req.id,
+                                  hint: text,
+                                  adminName: 'Spider-Vision Command HQ',
+                                });
+                                setHintInputs(prev => ({ ...prev, [req.id]: '' }));
+                              }
+                            }}
+                            className="px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-black font-mono text-xs font-black uppercase border-2 border-black shadow-[2px_2px_0_#000] active:translate-y-0.5 active:shadow-none cursor-pointer"
+                          >
+                            Send Tactical Intel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-slate-950 border border-slate-800 p-3 font-mono text-xs space-y-1">
+                        <div className="flex justify-between text-slate-400 text-[10px]">
+                          <span>DISPATCHED BY: {req.answeredBy || 'HQ Admin'}</span>
+                          <span>{req.answeredAt ? new Date(req.answeredAt).toLocaleTimeString() : ''}</span>
+                        </div>
+                        <div className="text-yellow-300 font-bold">"{req.hint}"</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'analytics' && analytics && (
           <div className="bg-slate-800 border-2 border-slate-700 p-6 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
             <h3 className="text-sm font-black tracking-widest text-slate-300 uppercase mb-4">CONTEST ANALYTICS & TELEMETRY</h3>
@@ -533,6 +690,12 @@ export default function App() {
                     <span className="text-slate-400">Most Failed</span>
                     <span className="text-red-400 font-bold truncate max-w-[120px] ml-2">{analytics.mostFailedQuestion}</span>
                   </div>
+                  {analytics.mostRequestedMission && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Most Requested</span>
+                      <span className="text-sky-400 font-bold truncate max-w-[120px] ml-2">{analytics.mostRequestedMission}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -555,21 +718,44 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Engagement Stats */}
+              {/* Powerup Usage Breakdown */}
               <div className="bg-slate-900 border border-slate-700 p-4 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 border-b border-slate-700 pb-1">Engagement</h4>
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 border-b border-slate-700 pb-1">Powerups</h4>
                 <div className="space-y-3 font-mono text-xs">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Avg Attempts</span>
-                    <span className="text-white font-bold">{analytics.averageAttempts}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Spider-Sense Used</span>
+                    <span className="text-slate-400">Spider-Sense</span>
                     <span className="text-yellow-400 font-bold">{analytics.spiderSenseUsage}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-slate-400">Web-Fluid (Freeze)</span>
+                    <span className="text-sky-400 font-bold">{analytics.webFluidUsage || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Suit Tech (Comms)</span>
+                    <span className="text-purple-400 font-bold">{analytics.suitTechUsage || 0}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-800 pt-1">
                     <span className="text-slate-400">Total Powerups</span>
-                    <span className="text-sky-400 font-bold">{analytics.totalPowerupUsage}</span>
+                    <span className="text-white font-bold">{analytics.totalPowerupUsage}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Spider-Comms Telemetry */}
+              <div className="bg-slate-900 border border-slate-700 p-4 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 border-b border-slate-700 pb-1">Tactical Comms</h4>
+                <div className="space-y-3 font-mono text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Total Requests</span>
+                    <span className="text-sky-400 font-bold">{analytics.totalHintRequests || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Hints Dispatched</span>
+                    <span className="text-green-400 font-bold">{analytics.hintsSent || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Avg Response</span>
+                    <span className="text-white font-bold">{analytics.averageResponseTimeSec || 0}s</span>
                   </div>
                 </div>
               </div>

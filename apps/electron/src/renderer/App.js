@@ -7,6 +7,8 @@ import LoginPage from './components/LoginPage';
 import Diagnostics from './components/Diagnostics';
 import Lobby from './components/Lobby';
 import HintsPage from './components/HintsPage';
+import SuitTechModal from './components/SuitTechModal';
+import SpiderCommsNotification from './components/SpiderCommsNotification';
 import fullBg from '../Assets/Full bg.png';
 import { socket, API_BASE } from './lib/socket';
 export default function App() {
@@ -28,8 +30,13 @@ export default function App() {
     const [currentRank, setCurrentRank] = useState(1);
     const [latestVerdict, setLatestVerdict] = useState('none');
     const [reconnectState, setReconnectState] = useState('IDLE');
-    // CRITICAL-4: Server-authoritative end time for the contest timer
     const [contestEndsAt, setContestEndsAt] = useState(null);
+    const [teamFrozenUntil, setTeamFrozenUntil] = useState(null);
+    const [spiderCommsHint, setSpiderCommsHint] = useState(null);
+    const [isSpiderCommsOpen, setIsSpiderCommsOpen] = useState(false);
+    const [isSuitTechModalOpen, setIsSuitTechModalOpen] = useState(false);
+    const [pendingHelpRequest, setPendingHelpRequest] = useState(null);
+    const [helpRequestsHistory, setHelpRequestsHistory] = useState([]);
     // Track solved problem IDs locally to avoid double-counting before server sync
     const solvedProblemIdsRef = useRef(new Set());
     const bypassedProblemIdsRef = useRef(new Set());
@@ -145,7 +152,32 @@ export default function App() {
             // CRITICAL-4: Restore timer from sync result (handles reconnects)
             if (data.endsAt)
                 setContestEndsAt(data.endsAt);
+            if (data.teamFrozenUntil)
+                setTeamFrozenUntil(data.teamFrozenUntil);
+            if (data.helpRequestsHistory)
+                setHelpRequestsHistory(data.helpRequestsHistory);
+            if (data.pendingHelpRequest)
+                setPendingHelpRequest(data.pendingHelpRequest);
         };
+        const handleTimerFrozen = (data) => {
+            setTeamFrozenUntil(data.frozenUntil);
+        };
+        const handleTimerResumed = () => {
+            setTeamFrozenUntil(null);
+        };
+        const handleHintResponse = (data) => {
+            setSpiderCommsHint(data);
+            setIsSpiderCommsOpen(true);
+            setPendingHelpRequest(null);
+            setHelpRequestsHistory(prev => [data, ...prev.filter(r => r.id !== data.requestId)]);
+        };
+        const handleRequestCreated = (data) => {
+            setPendingHelpRequest(data);
+        };
+        socket.on('team:timer_frozen', handleTimerFrozen);
+        socket.on('team:timer_resumed', handleTimerResumed);
+        socket.on('team:hint_response', handleHintResponse);
+        socket.on('suit_tech:request_created', handleRequestCreated);
         socket.on('contest:started', handleContestStarted);
         socket.on('contest:resumed', handleContestResumed);
         socket.on('contest:paused', handleContestPaused);
@@ -189,6 +221,10 @@ export default function App() {
         return () => {
             if (unsubscribeSecurity)
                 unsubscribeSecurity();
+            socket.off('team:timer_frozen', handleTimerFrozen);
+            socket.off('team:timer_resumed', handleTimerResumed);
+            socket.off('team:hint_response', handleHintResponse);
+            socket.off('suit_tech:request_created', handleRequestCreated);
             socket.off('contest:started', handleContestStarted);
             socket.off('contest:resumed', handleContestResumed);
             socket.off('contest:paused', handleContestPaused);
@@ -246,6 +282,16 @@ export default function App() {
         return (_jsx(Lobby, { teamName: teamName, onTeamNameChange: setTeamName, onProceed: () => setCurrentScreen('coding') }));
     }
     return (_jsxs("div", { className: "flex flex-col h-screen w-screen bg-[#080810] overflow-hidden text-white select-none relative", style: { backgroundImage: `url(${fullBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }, children: [contestStatus === 'NOT_STARTED' && (_jsx("div", { className: "absolute inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-md p-6", children: _jsxs("div", { className: "bg-[#080810] border-4 border-blue-500 rounded-xl p-10 max-w-2xl text-center shadow-[12px_12px_0px_0px_rgba(59,130,246,1)] comic-halftone", children: [_jsx("h1", { className: "text-5xl font-bold text-blue-500 mb-6 font-mono tracking-tighter uppercase", children: "WAITING FOR ADMIN" }), _jsx("p", { className: "text-xl text-white font-bold mb-8", children: "The contest will begin shortly. Please stand by." }), _jsx("div", { className: "flex justify-center items-center mb-4", children: _jsx("div", { className: "w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" }) })] }) })), isTeamPaused && !isAutoSubmitted && (_jsx("div", { className: "absolute inset-0 z-[70] flex items-center justify-center bg-red-900/90 backdrop-blur-md p-6", children: _jsxs("div", { className: "bg-black border-4 border-red-600 rounded-xl p-10 max-w-2xl text-center shadow-[12px_12px_0px_0px_rgba(220,38,38,1)] comic-halftone", children: [_jsx("h2", { className: "text-5xl font-bold text-red-500 mb-4 tracking-widest font-mono", children: "TEST PAUSED" }), _jsx("p", { className: "text-2xl text-white mb-6", children: securityWarning || `Security Violation Detected (Violation ${violationCount}/5).` }), _jsx("p", { className: "text-lg text-gray-300 mb-8 max-w-md mx-auto", children: "Your test session has been suspended by the anti-cheat system. You must wait for an administrator to review the logs and unlock your terminal." }), _jsx("div", { className: "inline-block px-6 py-3 border-2 border-red-600 text-red-500 font-mono text-sm uppercase tracking-widest animate-pulse", children: "PENDING ADMIN REVIEW..." })] }) })), isAutoSubmitted && (_jsx("div", { className: "absolute inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-6", children: _jsxs("div", { className: "bg-[#080810] border-4 border-red-600 rounded-xl p-10 max-w-2xl text-center shadow-[12px_12px_0px_0px_rgba(220,38,38,1)]", children: [_jsx("h1", { className: "text-6xl font-bold text-red-600 mb-6 font-mono tracking-tighter", children: "TEST TERMINATED" }), _jsx("p", { className: "text-2xl text-white font-bold mb-4", children: "Maximum security violations (5/5) reached." }), _jsx("p", { className: "text-lg text-gray-400 mb-8", children: "Your test has been automatically submitted. No further editing is permitted." }), _jsxs("div", { className: "flex justify-center items-center mb-8", children: [_jsx("span", { className: "text-red-500 animate-pulse", children: "\u25A0" }), _jsx("span", { className: "text-red-500 animate-pulse mx-2", style: { animationDelay: '150ms' }, children: "\u25A0" }), _jsx("span", { className: "text-red-500 animate-pulse", style: { animationDelay: '300ms' }, children: "\u25A0" })] }), _jsx("button", { onClick: () => window.electronAPI?.close(), className: "px-10 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded border-2 border-red-400 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-transform active:translate-y-1 active:translate-x-1 active:shadow-none text-xl tracking-widest", children: "EXIT PLATFORM" })] }) })), reconnectState !== 'IDLE' && (_jsxs("div", { className: `w-full py-2.5 px-4 border-b-4 border-black flex items-center justify-between text-xs font-mono font-bold select-none transition-all z-50 ${reconnectState === 'DISCONNECTED' ? 'bg-red-500 text-white animate-pulse' :
-                    reconnectState === 'RECONNECTING' ? 'bg-yellow-400 text-black animate-pulse' : 'bg-green-500 text-white'}`, children: [_jsxs("span", { className: "flex items-center gap-1.5", children: [reconnectState === 'DISCONNECTED' && "⚠️ DIMENSIONAL PORTAL INTERRUPTED • CHECK YOUR INTERNET ROUTER", reconnectState === 'RECONNECTING' && "⚡ DIMENSIONAL SYNAPSE DECAYING • RECONNECTING TO EARTH-1610 ANCHOR...", reconnectState === 'RESTORED' && "✓ MULTIVERSE RE-SYNCHRONIZED • WORKSPACE & CONTEST STATE RESTORED!"] }), _jsx("span", { className: "text-[9px] uppercase border border-black/25 px-1.5 py-0.5 bg-black/10", children: reconnectState === 'RESTORED' ? 'Resume Coding' : 'Do not close client' })] })), _jsx(TopBar, { isPaused: isTeamPaused || contestStatus !== 'RUNNING', teamName: teamName, onTeamNameChange: setTeamName, currentScreen: currentScreen, onNavigate: (screen) => setCurrentScreen(screen), hintStage: hintStage, contestEndsAt: contestEndsAt }), currentScreen === 'hints' ? (_jsx("div", { className: "flex-1 w-full relative min-h-0", children: _jsx(HintsPage, { hintStage: hintStage }) })) : (_jsxs("div", { className: "flex-1 flex overflow-auto p-6 gap-6 items-start justify-center", children: [_jsx(ProblemPanel, { questionNum: questionNum, setQuestionNum: setQuestionNum, currentProblem: problems[questionNum - 1] || null, totalProblems: problems.length, maxUnlockedQuestion: maxUnlockedQuestion, solvedProblemIds: solvedProblemIdsRef.current, bypassedProblemIds: bypassedProblemIdsRef.current, problems: problems }), _jsx(RightPanel, { questionNum: questionNum, selectedLang: selectedLang, setSelectedLang: setSelectedLang, isSaved: isSaved, setIsSaved: setIsSaved, powerupCounts: powerupCounts, onUsePowerup: handleUsePowerup, onUseSpideySenseSuccess: () => setCurrentScreen('hints'), currentProblem: problems[questionNum - 1] || null, teamId: teamId, teamName: teamName, solvedCount: solvedCount, currentRank: currentRank, latestVerdict: latestVerdict, hintStage: hintStage, totalProblems: problems.length })] }))] }));
+                    reconnectState === 'RECONNECTING' ? 'bg-yellow-400 text-black animate-pulse' : 'bg-green-500 text-white'}`, children: [_jsxs("span", { className: "flex items-center gap-1.5", children: [reconnectState === 'DISCONNECTED' && "⚠️ DIMENSIONAL PORTAL INTERRUPTED • CHECK YOUR INTERNET ROUTER", reconnectState === 'RECONNECTING' && "⚡ DIMENSIONAL SYNAPSE DECAYING • RECONNECTING TO EARTH-1610 ANCHOR...", reconnectState === 'RESTORED' && "✓ MULTIVERSE RE-SYNCHRONIZED • WORKSPACE & CONTEST STATE RESTORED!"] }), _jsx("span", { className: "text-[9px] uppercase border border-black/25 px-1.5 py-0.5 bg-black/10", children: reconnectState === 'RESTORED' ? 'Resume Coding' : 'Do not close client' })] })), _jsx(TopBar, { isPaused: isTeamPaused || contestStatus !== 'RUNNING', teamName: teamName, onTeamNameChange: setTeamName, currentScreen: currentScreen, onNavigate: (screen) => setCurrentScreen(screen), hintStage: hintStage, contestEndsAt: contestEndsAt, teamFrozenUntil: teamFrozenUntil }), currentScreen === 'hints' ? (_jsx("div", { className: "flex-1 w-full relative min-h-0", children: _jsx(HintsPage, { hintStage: hintStage, tacticalIntel: helpRequestsHistory }) })) : (_jsxs("div", { className: "flex-1 flex overflow-auto p-6 gap-6 items-start justify-center", children: [_jsx(ProblemPanel, { questionNum: questionNum, setQuestionNum: setQuestionNum, currentProblem: problems[questionNum - 1] || null, totalProblems: problems.length, maxUnlockedQuestion: maxUnlockedQuestion, solvedProblemIds: solvedProblemIdsRef.current, bypassedProblemIds: bypassedProblemIdsRef.current, problems: problems }), _jsx(RightPanel, { questionNum: questionNum, selectedLang: selectedLang, setSelectedLang: setSelectedLang, isSaved: isSaved, setIsSaved: setIsSaved, powerupCounts: powerupCounts, onUsePowerup: (type, pId) => {
+                            if (type === 'SUIT_TECH') {
+                                setIsSuitTechModalOpen(true);
+                            }
+                            else {
+                                handleUsePowerup(type, pId);
+                            }
+                        }, onUseSpideySenseSuccess: () => setCurrentScreen('hints'), currentProblem: problems[questionNum - 1] || null, teamId: teamId, teamName: teamName, solvedCount: solvedCount, currentRank: currentRank, latestVerdict: latestVerdict, hintStage: hintStage, totalProblems: problems.length })] })), _jsx(SuitTechModal, { isOpen: isSuitTechModalOpen, onClose: () => setIsSuitTechModalOpen(false), onConfirm: () => {
+                    const pId = problems[questionNum - 1]?.id;
+                    handleUsePowerup('SUIT_TECH', pId);
+                }, isPending: Boolean(pendingHelpRequest), currentProblemTitle: problems[questionNum - 1]?.title || `Mission ${questionNum}` }), _jsx(SpiderCommsNotification, { isOpen: isSpiderCommsOpen, hintData: spiderCommsHint, onClose: () => setIsSpiderCommsOpen(false) })] }));
 }
 //# sourceMappingURL=App.js.map

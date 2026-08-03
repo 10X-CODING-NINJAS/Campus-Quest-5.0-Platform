@@ -5,6 +5,7 @@ import FinalMissionScreen from './FinalMissionScreen';
 
 interface HintsPageProps {
   hintStage: number;
+  tacticalIntel?: any[];
 }
 
 // ── Landmark definitions ──────────────────────────────────────────────────────

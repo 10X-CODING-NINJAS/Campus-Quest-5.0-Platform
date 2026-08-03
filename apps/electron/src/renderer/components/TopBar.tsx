@@ -13,6 +13,7 @@ interface TopBarProps {
   hintStage?: number;
   // CRITICAL-4: Server-authoritative end time (ISO string) for the contest timer
   contestEndsAt?: string | null;
+  teamFrozenUntil?: string | null;
 }
 
 export default function TopBar({
@@ -25,7 +26,30 @@ export default function TopBar({
   onNavigate,
   hintStage = 0,
   contestEndsAt = null,
+  teamFrozenUntil = null,
 }: TopBarProps) {
+  // Compute Web-Fluid freeze seconds remaining
+  const computeFreezeRemaining = () => {
+    if (!teamFrozenUntil) return 0;
+    return Math.max(0, Math.ceil((new Date(teamFrozenUntil).getTime() - Date.now()) / 1000));
+  };
+
+  const [freezeSeconds, setFreezeSeconds] = useState(computeFreezeRemaining);
+
+  useEffect(() => {
+    setFreezeSeconds(computeFreezeRemaining());
+  }, [teamFrozenUntil]);
+
+  useEffect(() => {
+    if (freezeSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setFreezeSeconds(s => Math.max(0, s - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [freezeSeconds]);
+
+  const isTimerFrozen = freezeSeconds > 0;
+
   // CRITICAL-4: Derive remaining seconds from server end time
   const computeRemaining = () => {
     if (!contestEndsAt) return 0;
@@ -41,14 +65,14 @@ export default function TopBar({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contestEndsAt]);
 
-  // Tick down every second, stops when paused or at 0
+  // Tick down every second, stops when paused, frozen, or at 0
   useEffect(() => {
-    if (isPaused || seconds <= 0) return;
+    if (isPaused || isTimerFrozen || seconds <= 0) return;
     const interval = setInterval(() => {
       setSeconds(s => Math.max(0, s - 1));
     }, 1000);
     return () => clearInterval(interval);
-  }, [isPaused, seconds > 0]);
+  }, [isPaused, isTimerFrozen, seconds > 0]);
 
   useEffect(() => {
     const blink = setInterval(() => setColonVisible(v => !v), 500);
@@ -130,6 +154,16 @@ export default function TopBar({
           <div className="font-digital text-red-500 font-bold text-2xl tracking-widest leading-none drop-shadow-[0_0_8px_#ef4444]">
             {h}<span className={colonVisible ? 'opacity-100' : 'opacity-20'}>:</span>{m}<span className={colonVisible ? 'opacity-100' : 'opacity-20'}>:</span>{s}
           </div>
+
+          {/* WEB-FLUID ACTIVE HUD BANNER */}
+          {isTimerFrozen && (
+            <div className="mt-1 bg-sky-500 text-black border-2 border-black px-3 py-0.5 font-mono text-[10px] font-black uppercase shadow-[2px_2px_0_#000] animate-pulse flex items-center gap-1.5 whitespace-nowrap">
+              <span>🕸 WEB-FLUID ACTIVE</span>
+              <span className="bg-black text-sky-300 px-1.5 py-0.2 rounded font-bold">
+                Time Frozen {freezeSeconds}s...
+              </span>
+            </div>
+          )}
         </div>
       )}
 

@@ -6,6 +6,8 @@ import LoginPage from './components/LoginPage';
 import Diagnostics from './components/Diagnostics';
 import Lobby from './components/Lobby';
 import HintsPage from './components/HintsPage';
+import SuitTechModal from './components/SuitTechModal';
+import SpiderCommsNotification from './components/SpiderCommsNotification';
 import fullBg from '../Assets/Full bg.png';
 import { socket, API_BASE } from './lib/socket';
 
@@ -26,10 +28,15 @@ export default function App() {
   const [hintStage, setHintStage] = useState(0);
   const [solvedCount, setSolvedCount] = useState(0);
   const [currentRank, setCurrentRank] = useState(1);
-  const [latestVerdict, setLatestVerdict] = useState<string>('none');
+  const [latestVerdict, setLatestVerdict] = useState('none');
   const [reconnectState, setReconnectState] = useState<'IDLE' | 'DISCONNECTED' | 'RECONNECTING' | 'RESTORED'>('IDLE');
-  // CRITICAL-4: Server-authoritative end time for the contest timer
   const [contestEndsAt, setContestEndsAt] = useState<string | null>(null);
+  const [teamFrozenUntil, setTeamFrozenUntil] = useState<string | null>(null);
+  const [spiderCommsHint, setSpiderCommsHint] = useState<{ hint: string; answeredBy?: string; answeredAt?: string; problemId?: string } | null>(null);
+  const [isSpiderCommsOpen, setIsSpiderCommsOpen] = useState(false);
+  const [isSuitTechModalOpen, setIsSuitTechModalOpen] = useState(false);
+  const [pendingHelpRequest, setPendingHelpRequest] = useState<any>(null);
+  const [helpRequestsHistory, setHelpRequestsHistory] = useState<any[]>([]);
   // Track solved problem IDs locally to avoid double-counting before server sync
   const solvedProblemIdsRef = useRef<Set<string>>(new Set());
   const bypassedProblemIdsRef = useRef<Set<string>>(new Set());
@@ -142,7 +149,31 @@ export default function App() {
 
       // CRITICAL-4: Restore timer from sync result (handles reconnects)
       if (data.endsAt) setContestEndsAt(data.endsAt);
+      if (data.teamFrozenUntil) setTeamFrozenUntil(data.teamFrozenUntil);
+      if (data.helpRequestsHistory) setHelpRequestsHistory(data.helpRequestsHistory);
+      if (data.pendingHelpRequest) setPendingHelpRequest(data.pendingHelpRequest);
     };
+
+    const handleTimerFrozen = (data: { frozenUntil: string }) => {
+      setTeamFrozenUntil(data.frozenUntil);
+    };
+    const handleTimerResumed = () => {
+      setTeamFrozenUntil(null);
+    };
+    const handleHintResponse = (data: any) => {
+      setSpiderCommsHint(data);
+      setIsSpiderCommsOpen(true);
+      setPendingHelpRequest(null);
+      setHelpRequestsHistory(prev => [data, ...prev.filter(r => r.id !== data.requestId)]);
+    };
+    const handleRequestCreated = (data: any) => {
+      setPendingHelpRequest(data);
+    };
+
+    socket.on('team:timer_frozen', handleTimerFrozen);
+    socket.on('team:timer_resumed', handleTimerResumed);
+    socket.on('team:hint_response', handleHintResponse);
+    socket.on('suit_tech:request_created', handleRequestCreated);
 
     socket.on('contest:started', handleContestStarted);
     socket.on('contest:resumed', handleContestResumed);
@@ -188,6 +219,10 @@ export default function App() {
 
     return () => {
       if (unsubscribeSecurity) unsubscribeSecurity();
+      socket.off('team:timer_frozen', handleTimerFrozen);
+      socket.off('team:timer_resumed', handleTimerResumed);
+      socket.off('team:hint_response', handleHintResponse);
+      socket.off('suit_tech:request_created', handleRequestCreated);
       socket.off('contest:started', handleContestStarted);
       socket.off('contest:resumed', handleContestResumed);
       socket.off('contest:paused', handleContestPaused);
@@ -346,12 +381,13 @@ export default function App() {
         onNavigate={(screen) => setCurrentScreen(screen)}
         hintStage={hintStage}
         contestEndsAt={contestEndsAt}
+        teamFrozenUntil={teamFrozenUntil}
       />
 
       {/* Main Workspace Layout */}
       {currentScreen === 'hints' ? (
         <div className="flex-1 w-full relative min-h-0">
-          <HintsPage hintStage={hintStage} />
+          <HintsPage hintStage={hintStage} tacticalIntel={helpRequestsHistory} />
         </div>
       ) : (
         <div className="flex-1 flex overflow-auto p-6 gap-6 items-start justify-center">
@@ -376,7 +412,13 @@ export default function App() {
             isSaved={isSaved}
             setIsSaved={setIsSaved}
             powerupCounts={powerupCounts}
-            onUsePowerup={handleUsePowerup}
+            onUsePowerup={(type, pId) => {
+              if (type === 'SUIT_TECH') {
+                setIsSuitTechModalOpen(true);
+              } else {
+                handleUsePowerup(type, pId);
+              }
+            }}
             onUseSpideySenseSuccess={() => setCurrentScreen('hints')}
             currentProblem={problems[questionNum - 1] || null}
             teamId={teamId}
@@ -389,6 +431,25 @@ export default function App() {
           />
         </div>
       )}
+
+      {/* Suit Tech Request Confirmation Modal */}
+      <SuitTechModal
+        isOpen={isSuitTechModalOpen}
+        onClose={() => setIsSuitTechModalOpen(false)}
+        onConfirm={() => {
+          const pId = problems[questionNum - 1]?.id;
+          handleUsePowerup('SUIT_TECH', pId);
+        }}
+        isPending={Boolean(pendingHelpRequest)}
+        currentProblemTitle={problems[questionNum - 1]?.title || `Mission ${questionNum}`}
+      />
+
+      {/* Spider-Comms Tactical Intel Notification Overlay */}
+      <SpiderCommsNotification
+        isOpen={isSpiderCommsOpen}
+        hintData={spiderCommsHint}
+        onClose={() => setIsSpiderCommsOpen(false)}
+      />
     </div>
   );
 }

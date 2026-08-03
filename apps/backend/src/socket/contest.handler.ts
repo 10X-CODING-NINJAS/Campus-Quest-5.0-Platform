@@ -1,6 +1,6 @@
 import { db } from '../db';
-import { teams, contests, teamPowerups, submissions } from '../db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { teams, contests, teamPowerups, submissions, helpRequests } from '../db/schema';
+import { eq, and, inArray, desc } from 'drizzle-orm';
 import { calculateLeaderboard } from '../utils/leaderboard';
 import { reportViolation } from '../services/violations';
 
@@ -16,18 +16,24 @@ export function registerContestHandlers(socket: any, io: any) {
     const teamId = socket.data?.teamId;
     let isPaused = false;
     let hintStage = 0;
+    let teamFrozenUntil: string | null = null;
     let powerupCounts = { SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 };
     
     let solvedCount = 0;
     let solvedProblemIds: string[] = [];
     let bypassedProblemIds: string[] = [];
     let currentRank = 1;
+    let requestsHistory: any[] = [];
+    let pendingHelpRequest: any = null;
 
     if (teamId) {
       const teamData = await db.select().from(teams).where(eq(teams.id, teamId));
       if (teamData.length > 0) {
         isPaused = teamData[0].isPaused;
         hintStage = teamData[0].hintStage;
+        if (teamData[0].teamFrozenUntil) {
+          teamFrozenUntil = new Date(teamData[0].teamFrozenUntil).toISOString();
+        }
       }
       
       const allUsages = await db.select()
@@ -58,6 +64,32 @@ export function registerContestHandlers(socket: any, io: any) {
       bypassedProblemIds = Array.from(new Set(bypassedList));
       solvedCount = solvedProblemIds.length;
 
+      // Fetch team help requests
+      const teamRequests = await db.select()
+        .from(helpRequests)
+        .where(eq(helpRequests.teamId, teamId))
+        .orderBy(desc(helpRequests.createdAt));
+
+      requestsHistory = teamRequests.map(r => ({
+        id: r.id,
+        problemId: r.problemId,
+        status: r.status,
+        hint: r.hint,
+        answeredBy: r.answeredBy,
+        createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
+        answeredAt: r.answeredAt ? new Date(r.answeredAt).toISOString() : null,
+      }));
+
+      const pendingReq = teamRequests.find(r => r.status === 'PENDING');
+      if (pendingReq) {
+        pendingHelpRequest = {
+          id: pendingReq.id,
+          problemId: pendingReq.problemId,
+          status: pendingReq.status,
+          createdAt: pendingReq.createdAt ? new Date(pendingReq.createdAt).toISOString() : null,
+        };
+      }
+
       // H4: Compute rank using the unified leaderboard utility
       const leaderboard = await calculateLeaderboard(db);
       const teamStats = leaderboard.find(t => t.id === teamId);
@@ -67,12 +99,15 @@ export function registerContestHandlers(socket: any, io: any) {
     socket.emit('contest:sync_result', {
       contestStatus: globalContest?.status || 'NOT_STARTED',
       isTeamPaused: isPaused,
+      teamFrozenUntil,
       powerupCounts,
       hintStage,
       solvedCount,
       solvedProblemIds,
       bypassedProblemIds,
       currentRank,
+      helpRequestsHistory: requestsHistory,
+      pendingHelpRequest,
       // Timing data for client-side timer synchronization
       endsAt: globalContest?.endsAt ? new Date(globalContest.endsAt).toISOString() : null,
       serverTime: new Date().toISOString(),
