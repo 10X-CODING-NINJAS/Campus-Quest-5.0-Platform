@@ -49,7 +49,7 @@
   },
   "build": {
     "appId": "com.campusquest.platform",
-    "productName": "Campus Quest",
+    "productName": "Campus Quest 5.0",
     "directories": {
       "output": "release/${version}"
     },
@@ -71,7 +71,7 @@
       ]
     },
     "win": {
-      "icon": "resources/icon.ico",
+      "icon": "resources/icon.png",
       "target": [
         {
           "target": "nsis",
