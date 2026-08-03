@@ -14,9 +14,12 @@ WORKDIR /app
 # Copy the root package manager files and base config
 COPY package.json package-lock.json turbo.json tsconfig.base.json ./
 
-# Copy packages and apps (since it's a monorepo, we need shared code)
+# Copy packages, apps, and problem definitions
 COPY packages ./packages
 COPY apps/backend ./apps/backend
+COPY problems ./problems
+
+ENV PROBLEMS_DIR=/app/problems
 
 # Install dependencies and build
 RUN npm install
