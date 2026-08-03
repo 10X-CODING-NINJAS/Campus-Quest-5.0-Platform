@@ -4,7 +4,11 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "out/**", "build/**"]
+      "outputs": ["dist/**", ".next/**", "out/**", "build/**", "dist-electron/**"]
+    },
+    "build:web": {
+      "dependsOn": ["^build:web", "^build"],
+      "outputs": ["dist/**"]
     },
     "dev": {
       "cache": false,
