@@ -27,6 +27,7 @@ export async function runMigrations() {
       await db.execute(sql`SELECT "is_paused" FROM "teams" LIMIT 0`);
     } catch {
       console.log('[Database] Schema is stale or missing. Dropping all tables to re-apply migrations...');
+      await db.execute(sql`DROP SCHEMA IF EXISTS drizzle CASCADE`);
       await db.execute(sql`DROP SCHEMA public CASCADE`);
       await db.execute(sql`CREATE SCHEMA public`);
       await db.execute(sql`GRANT ALL ON SCHEMA public TO PUBLIC`);
