@@ -16,6 +16,7 @@ import { syncProblemsToDatabase } from './services/problems';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET, ADMIN_SECRET } from './routes/admin';
 import { startJudgeWorker } from './workers/judge.worker';
+import { runMigrations } from './db/migrate';
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 const HOST = process.env.HOST ?? '0.0.0.0';
@@ -30,6 +31,9 @@ async function bootstrap() {
     console.error('[Startup] Please check your .env file and restart.');
     process.exit(1);
   }
+
+  // Automatically apply database migrations / create missing tables
+  await runMigrations();
 
   // Sync local problems to database
   await syncProblemsToDatabase();
