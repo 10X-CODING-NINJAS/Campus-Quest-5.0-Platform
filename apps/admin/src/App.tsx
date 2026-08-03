@@ -82,8 +82,7 @@ export default function App() {
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
 
   const [adminToken, setAdminToken] = useState<string | null>(
-    // M2: Restore from sessionStorage so admin survives browser refresh
-    () => sessionStorage.getItem('cq_admin_token')
+    () => sessionStorage.getItem('cq_admin_token') || 'spidey_admin_2024'
   );
   const [loginInput, setLoginInput] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);

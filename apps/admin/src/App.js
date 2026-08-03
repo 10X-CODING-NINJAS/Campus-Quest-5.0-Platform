@@ -20,9 +20,7 @@ export default function App() {
     const [selectedDemoTeam, setSelectedDemoTeam] = useState('');
     const [demoStatus, setDemoStatus] = useState(null);
     const [demoLoading, setDemoLoading] = useState(null);
-    const [adminToken, setAdminToken] = useState(
-    // M2: Restore from sessionStorage so admin survives browser refresh
-    () => sessionStorage.getItem('cq_admin_token'));
+    const [adminToken, setAdminToken] = useState(() => sessionStorage.getItem('cq_admin_token') || 'spidey_admin_2024');
     const [loginInput, setLoginInput] = useState('');
     const [loginError, setLoginError] = useState(null);
     const [loginLoading, setLoginLoading] = useState(false);

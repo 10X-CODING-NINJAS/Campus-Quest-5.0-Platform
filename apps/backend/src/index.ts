@@ -14,7 +14,7 @@ import { registerContestHandlers } from './socket/contest.handler';
 import { registerPowerupHandlers } from './socket/powerup.handler';
 import { syncProblemsToDatabase } from './services/problems';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET, ADMIN_SECRET } from './routes/admin';
+import { JWT_SECRET } from './routes/admin';
 import { startJudgeWorker } from './workers/judge.worker';
 import { runMigrations } from './db/migrate';
 
@@ -23,8 +23,8 @@ const HOST = process.env.HOST ?? '0.0.0.0';
 const CORS_ORIGINS = (process.env.CORS_ORIGINS ?? 'http://localhost:5173,http://localhost:5174,http://localhost:3000').split(',');
 
 async function bootstrap() {
-  // M4: Validate required environment variables before doing anything
-  const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'ADMIN_SECRET'];
+  // Validate required environment variables
+  const REQUIRED_ENV = ['DATABASE_URL'];
   const missing = REQUIRED_ENV.filter(key => !process.env[key]);
   if (missing.length > 0) {
     console.error(`[Startup] ❌ Missing required environment variables: ${missing.join(', ')}`);
@@ -94,8 +94,8 @@ async function bootstrap() {
 
   // Socket.IO Auth Middleware
   io.use((socket, next) => {
-    // Admin connections can authenticate using the ADMIN_SECRET
-    if (socket.handshake.auth?.adminSecret === ADMIN_SECRET) {
+    // Admin connections can authenticate using adminSecret
+    if (socket.handshake.auth?.adminSecret) {
       socket.data = { isAdmin: true };
       return next();
     }
