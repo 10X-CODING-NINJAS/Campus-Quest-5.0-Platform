@@ -1,0 +1,14 @@
+[providers]
+node = true
+
+[variables]
+NPM_CONFIG_PRODUCTION = "false"
+
+[phases.setup]
+nixPkgs = ["...", "nodejs", "python3", "gcc", "jdk17"]
+
+[phases.build]
+cmds = ["npm install", "turbo run build --filter=@campus-quest/backend"]
+
+[start]
+cmd = "npm run start --prefix apps/backend"

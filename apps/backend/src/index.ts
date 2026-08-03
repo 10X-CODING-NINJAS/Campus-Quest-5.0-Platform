@@ -15,6 +15,7 @@ import { registerPowerupHandlers } from './socket/powerup.handler';
 import { syncProblemsToDatabase } from './services/problems';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET, ADMIN_SECRET } from './routes/admin';
+import { startJudgeWorker } from './workers/judge.worker';
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 const HOST = process.env.HOST ?? '0.0.0.0';
@@ -34,6 +35,9 @@ async function bootstrap() {
   await syncProblemsToDatabase();
   // Seed test / dev teams (idempotent)
   await seedTestTeams();
+  
+  // Start the background code execution worker
+  const worker = startJudgeWorker();
 
   const fastify = Fastify({ logger: true });
 
@@ -132,6 +136,7 @@ async function bootstrap() {
   for (const signal of signals) {
     process.on(signal, async () => {
       console.log(`\n[Shutdown] ${signal} received, shutting down gracefully…`);
+      await worker.close();
       io.close();
       await fastify.close();
       console.log('[Shutdown] Server closed. Goodbye.');
