@@ -1,6 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import {
+  ShieldAlert,
+  Radio,
+  Activity,
+  Trophy,
+  Send,
+  Zap,
+  AlertTriangle,
+  Play,
+  Pause,
+  RotateCcw,
+  OctagonX,
+  Search,
+  MessageSquare,
+  BarChart3,
+  Flame,
+  Users,
+  Sparkles,
+} from 'lucide-react';
 
 const API_URL = 'http://localhost:3001/admin';
 const DEMO_URL = 'http://localhost:3001/demo';
@@ -98,6 +117,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'monitoring' | 'leaderboard' | 'tactical' | 'analytics' | 'demo'>('monitoring');
   const [hintInputs, setHintInputs] = useState<Record<string, string>>({});
+  const [searchFilter, setSearchFilter] = useState('');
   const [demoModeEnabled, setDemoModeEnabled] = useState(false);
   const [demoTeams, setDemoTeams] = useState<DemoTeam[]>([]);
   const [selectedDemoTeam, setSelectedDemoTeam] = useState<string>('');
@@ -105,22 +125,19 @@ export default function App() {
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
 
   const [adminToken, setAdminToken] = useState<string | null>(
-    // M2: Restore from sessionStorage so admin survives browser refresh
     () => sessionStorage.getItem('cq_admin_token')
   );
   const [loginInput, setLoginInput] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
 
-  // Setup Axios globally when token is set
   useEffect(() => {
     if (adminToken) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${adminToken}`;
-      sessionStorage.setItem('cq_admin_token', adminToken); // M2: persist
+      sessionStorage.setItem('cq_admin_token', adminToken);
     }
   }, [adminToken]);
 
-  // Fetch initial state
   const fetchData = useCallback(async () => {
     try {
       const teamsRes = await axios.get(`http://localhost:3001/admin/teams`);
@@ -142,17 +159,14 @@ export default function App() {
     if (!adminToken) return;
     fetchData();
 
-    // Check demo mode status
     axios.get(`${DEMO_URL}/status`).then(res => {
       setDemoModeEnabled(res.data.enabled);
     }).catch(() => {});
 
-    // Load both demo teams AND test teams into the selector
     Promise.all([
       axios.get(`${DEMO_URL}/teams`).catch(() => ({ data: [] })),
       axios.get('http://localhost:3001/api/test-teams').catch(() => ({ data: [] })),
     ]).then(([demoRes, testRes]) => {
-      // Test teams come first (these are the real login accounts)
       const testList = (testRes.data as any[]).map((t: any) => ({ id: t.id, name: `${t.name} (test)`, email: '' }));
       const demoList = (demoRes.data as DemoTeam[]);
       const merged = [...testList, ...demoList];
@@ -160,7 +174,6 @@ export default function App() {
       if (merged.length > 0) setSelectedDemoTeam(merged[0].id);
     });
 
-    // Connect admin to live WebSocket updates
     const socket = io(SOCKET_URL, {
       auth: { adminSecret: adminToken }
     });
@@ -218,7 +231,6 @@ export default function App() {
     setLoginLoading(true);
     setLoginError(null);
     try {
-      // H5: Validate secret against the backend — reject before setting token
       await axios.get(`${API_URL}/contest-status`, {
         headers: { Authorization: `Bearer ${secret}` }
       });
@@ -234,387 +246,425 @@ export default function App() {
     }
   };
 
-  if (!adminToken) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
-        <form onSubmit={handleLogin} className="bg-gray-800 p-8 rounded-lg shadow-xl w-96">
-          <h2 className="text-2xl font-bold text-red-500 mb-6 text-center">Admin Access</h2>
-          <div className="mb-4">
-            <label className="block text-gray-400 text-sm mb-2">Admin Secret</label>
-            <input
-              type="password"
-              className="w-full bg-gray-700 text-white rounded px-3 py-2"
-              value={loginInput}
-              onChange={(e) => setLoginInput(e.target.value)}
-            />
-          </div>
-          {loginError && <div className="text-red-500 text-sm mb-4">{loginError}</div>}
-          <button type="submit" disabled={loginLoading} className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white py-2 rounded">
-            {loginLoading ? 'Verifying…' : 'Login'}
-          </button>
-        </form>
-      </div>
-    );
-  }
-
   const handleAction = async (action: 'start' | 'pause' | 'resume' | 'stop') => {
+    setError(null);
     try {
-      setError(null);
-      let endpoint = '';
-      if (action === 'start') endpoint = '/start-contest';
-      else if (action === 'pause') endpoint = '/pause-contest';
-      else if (action === 'resume') endpoint = '/resume-contest';
-      else if (action === 'stop') endpoint = '/emergency-stop';
-      await axios.post(`${API_URL}${endpoint}`);
-      setContestStatus(action === 'stop' ? 'ENDED' : action === 'start' || action === 'resume' ? 'RUNNING' : 'PAUSED');
+      if (action === 'start') await axios.post(`${API_URL}/start-contest`);
+      if (action === 'pause') await axios.post(`${API_URL}/pause-contest`);
+      if (action === 'resume') await axios.post(`${API_URL}/resume-contest`);
+      if (action === 'stop') await axios.post(`${API_URL}/emergency-stop`);
       fetchData();
     } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'An error occurred');
+      setError(err.response?.data?.message || `Failed to execute ${action}`);
     }
   };
 
   const handleResumeTeam = async (teamId: string) => {
     try {
-      setError(null);
       await axios.post(`${API_URL}/resume-team`, { teamId });
       fetchData();
     } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Failed to resume team');
+      setError(`Failed to unlock team ${teamId}`);
     }
   };
 
-  // ── Demo helpers ────────────────────────────────────────────────────────────
-  const demoAction = async (
-    endpoint: string,
-    payload: Record<string, any> = {},
-    label: string,
-  ) => {
+  const demoAction = async (endpoint: string, body: object, label: string) => {
     setDemoLoading(label);
     setDemoStatus(null);
     try {
-      const res = await axios.post(`${DEMO_URL}/${endpoint}`, payload);
-      setDemoStatus(`✓ ${label}: ${res.data.message || 'Done'}`);
+      const res = await axios.post(`${DEMO_URL}/${endpoint}`, body);
+      setDemoStatus(`✓ ${res.data.message || 'Success'}`);
       fetchData();
     } catch (err: any) {
-      setDemoStatus(`✗ ${label} failed: ${err.response?.data?.message || err.message}`);
+      setDemoStatus(`❌ Error: ${err.response?.data?.message || err.message}`);
     } finally {
       setDemoLoading(null);
     }
   };
 
-  const getVerdictBadge = (verdict: string) => {
-    switch (verdict) {
-      case 'AC': return 'bg-green-100 text-green-700 border-green-300';
-      case 'CE': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
-      default:   return 'bg-red-100 text-red-700 border-red-300';
-    }
-  };
-
-  const DemoButton = ({
-    label, icon, onClick, color = 'slate',
-  }: { label: string; icon: string; onClick: () => void; color?: string }) => {
-    const colorMap: Record<string, string> = {
-      green:  'bg-green-700 hover:bg-green-600 border-green-400',
-      blue:   'bg-sky-700 hover:bg-sky-600 border-sky-400',
-      amber:  'bg-amber-700 hover:bg-amber-600 border-amber-400',
-      red:    'bg-red-700 hover:bg-red-600 border-red-400',
-      purple: 'bg-purple-700 hover:bg-purple-600 border-purple-400',
-      slate:  'bg-slate-700 hover:bg-slate-600 border-slate-500',
-    };
-    const cls = colorMap[color] || colorMap.slate;
+  if (!adminToken) {
     return (
-      <button
-        onClick={onClick}
-        disabled={demoLoading !== null}
-        className={`flex flex-col items-center gap-1.5 px-3 py-3 ${cls} border-2 text-white font-mono text-[10px] font-bold uppercase tracking-wider transition-all shadow-[2px_2px_0_#000] active:translate-y-0.5 active:shadow-none disabled:opacity-40 disabled:cursor-not-allowed min-w-[100px]`}
-        id={`demo-btn-${label.toLowerCase().replace(/\s+/g, '-')}`}
-      >
-        <span className="text-xl">{icon}</span>
-        <span className="leading-tight text-center">{label}</span>
-        {demoLoading === label && <span className="text-[8px] animate-pulse text-yellow-300">Working…</span>}
-      </button>
-    );
-  };
+      <div className="min-h-screen bg-[#060812] text-slate-100 flex items-center justify-center p-6 font-sans relative overflow-hidden">
+        {/* Background Ambient Glows */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-red-600/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-10 right-10 w-80 h-80 bg-sky-600/10 rounded-full blur-3xl pointer-events-none" />
 
-  return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-6 font-sans">
-      <div className="max-w-7xl mx-auto space-y-6">
-
-        {/* Header Bar */}
-        <header className="bg-slate-800 border-2 border-slate-700 p-5 rounded-none flex items-center justify-between shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-          <div>
-            <h1 className="text-2xl font-black tracking-widest text-red-500 uppercase">🕷 SPIDER-VISION ADMIN CONSOLE</h1>
-            <p className="text-xs text-slate-400 font-mono mt-1">REAL-TIME MULTIVERSE CONTEST STATE TELEMETRY</p>
+        <div className="w-full max-w-md bg-slate-900/90 border-2 border-red-500/50 backdrop-blur-xl p-8 rounded-2xl shadow-[0_0_50px_rgba(239,68,68,0.2)] z-10 select-none">
+          <div className="flex flex-col items-center mb-6 text-center">
+            <div className="w-14 h-14 bg-red-500/10 border-2 border-red-500/80 rounded-2xl flex items-center justify-center text-red-500 mb-4 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+              <Radio className="w-8 h-8 animate-pulse" />
+            </div>
+            <h1 className="text-2xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-rose-400 to-amber-400 uppercase">
+              SPIDER-VISION ADMIN
+            </h1>
+            <p className="text-xs font-mono text-slate-400 mt-1 uppercase tracking-wider">
+              Multiverse Command Center Authorization
+            </p>
           </div>
-          <div className="flex items-center gap-4">
-            {demoModeEnabled && (
-              <div className="bg-yellow-900/60 border border-yellow-500 px-3 py-1.5 text-xs font-mono text-yellow-400 animate-pulse">
-                ⚠ DEMO MODE ACTIVE
+
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <label className="block text-xs font-mono text-slate-300 font-bold uppercase mb-2 tracking-wider">
+                Admin Security Token
+              </label>
+              <input
+                type="password"
+                value={loginInput}
+                onChange={e => setLoginInput(e.target.value)}
+                placeholder="Enter ADMIN_SECRET..."
+                className="w-full bg-slate-950 border-2 border-slate-700 rounded-xl px-4 py-3 text-sm font-mono text-white focus:outline-none focus:border-red-500 transition-colors shadow-inner"
+                autoFocus
+              />
+            </div>
+
+            {loginError && (
+              <div className="bg-red-950/60 border border-red-500/60 rounded-xl p-3 text-xs font-mono text-red-300 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <span>{loginError}</span>
               </div>
             )}
-            <div className="bg-slate-950 px-4 py-2 border border-slate-700 text-xs font-mono">
-              CONTEST STATUS: <span className={`font-bold ${contestStatus === 'RUNNING' ? 'text-green-400' : 'text-red-500 animate-pulse'}`}>{contestStatus.toUpperCase()}</span>
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full py-3.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-mono text-xs font-black uppercase tracking-widest rounded-xl border border-red-400/30 shadow-[0_0_20px_rgba(225,29,72,0.4)] transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+            >
+              {loginLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Authorizing...</span>
+                </>
+              ) : (
+                <>
+                  <ShieldAlert className="w-4 h-4" />
+                  <span>Connect to Console</span>
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  const filteredTeams = teams.filter(t => t.name.toLowerCase().includes(searchFilter.toLowerCase()));
+  const pendingRequestsCount = helpRequests.filter(r => r.status === 'PENDING').length;
+
+  return (
+    <div className="min-h-screen bg-[#070913] text-slate-100 p-6 font-sans relative overflow-x-hidden selection:bg-red-500 selection:text-white">
+      {/* Background Ambient Field */}
+      <div className="fixed top-0 left-1/4 w-[600px] h-[600px] bg-red-600/5 rounded-full blur-[140px] pointer-events-none" />
+      <div className="fixed bottom-0 right-1/4 w-[600px] h-[600px] bg-sky-600/5 rounded-full blur-[140px] pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto space-y-6 relative z-10">
+
+        {/* Top Header Bar */}
+        <header className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-[0_8px_30px_rgb(0,0,0,0.4)]">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 bg-red-500/10 border border-red-500/40 rounded-xl flex items-center justify-center text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+              <Radio className="w-6 h-6 animate-pulse" />
             </div>
+            <div>
+              <h1 className="text-xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-rose-400 to-amber-300 uppercase">
+                🕷 SPIDER-VISION ADMIN CONSOLE
+              </h1>
+              <p className="text-[11px] text-slate-400 font-mono mt-0.5 tracking-wider uppercase">
+                Real-Time Multiverse Telemetry & Tactical Command
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {demoModeEnabled && (
+              <div className="bg-yellow-950/60 border border-yellow-500/60 px-3 py-1.5 rounded-lg text-xs font-mono text-yellow-400 flex items-center gap-2 animate-pulse">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>DEMO MODE ACTIVE</span>
+              </div>
+            )}
+
+            <div className="bg-slate-950/90 px-4 py-2 rounded-xl border border-slate-800 text-xs font-mono flex items-center gap-2 shadow-inner">
+              <span className="text-slate-400">CONTEST STATUS:</span>
+              <span className={`font-black px-2 py-0.5 rounded text-[10px] uppercase border ${
+                contestStatus === 'RUNNING' ? 'bg-emerald-950 border-emerald-500 text-emerald-400' :
+                contestStatus === 'PAUSED' ? 'bg-amber-950 border-amber-500 text-amber-400 animate-pulse' :
+                'bg-rose-950 border-rose-500 text-rose-400'
+              }`}>
+                {contestStatus}
+              </span>
+            </div>
+
+            <button
+              onClick={() => {
+                sessionStorage.removeItem('cq_admin_token');
+                setAdminToken(null);
+              }}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono font-bold rounded-xl border border-slate-700 transition-colors"
+            >
+              Sign Out
+            </button>
           </div>
         </header>
 
-        {/* Global Controls Grid */}
-        <section className="bg-slate-800 border-2 border-slate-700 p-5 rounded-none shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-sm font-black tracking-widest text-slate-300 uppercase">CONTEST CONTROLS</h2>
-            {error && <span className="text-xs text-red-400 font-mono font-bold">⚠️ ERROR: {error}</span>}
+        {/* Global Contest Controls Grid */}
+        <section className="bg-slate-900/60 backdrop-blur-md border border-slate-800 p-5 rounded-2xl shadow-lg">
+          <div className="flex items-center justify-between mb-3.5">
+            <h2 className="text-xs font-mono font-black tracking-widest text-slate-300 uppercase flex items-center gap-2">
+              <Activity className="w-4 h-4 text-red-500" />
+              GLOBAL CONTEST CONTROLS
+            </h2>
+            {error && (
+              <span className="text-xs text-rose-400 font-mono font-bold flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" /> {error}
+              </span>
+            )}
           </div>
-          <div className="flex flex-wrap gap-4">
-            <button onClick={() => handleAction('start')} className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-mono text-xs font-bold uppercase border-2 border-black shadow-[2px_2px_0_#000] active:translate-y-0.5 active:shadow-none">
-              Start Contest
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs">
+            <button
+              onClick={() => handleAction('start')}
+              className="px-4 py-3 bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl border border-emerald-400/40 shadow-[0_0_15px_rgba(16,185,129,0.2)] transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+            >
+              <Play className="w-4 h-4" /> Start Contest
             </button>
-            <button onClick={() => handleAction('pause')} className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-mono text-xs font-bold uppercase border-2 border-black shadow-[2px_2px_0_#000] active:translate-y-0.5 active:shadow-none">
-              Pause Contest
+            <button
+              onClick={() => handleAction('pause')}
+              className="px-4 py-3 bg-amber-600/90 hover:bg-amber-500 text-white font-bold uppercase rounded-xl border border-amber-400/40 shadow-[0_0_15px_rgba(245,158,11,0.2)] transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+            >
+              <Pause className="w-4 h-4" /> Pause Contest
             </button>
-            <button onClick={() => handleAction('resume')} className="px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-mono text-xs font-bold uppercase border-2 border-black shadow-[2px_2px_0_#000] active:translate-y-0.5 active:shadow-none">
-              Resume Contest
+            <button
+              onClick={() => handleAction('resume')}
+              className="px-4 py-3 bg-sky-600/90 hover:bg-sky-500 text-white font-bold uppercase rounded-xl border border-sky-400/40 shadow-[0_0_15px_rgba(14,165,233,0.2)] transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+            >
+              <RotateCcw className="w-4 h-4" /> Resume Contest
             </button>
-            <button onClick={() => handleAction('stop')} className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-mono text-xs font-bold uppercase border-2 border-black shadow-[2px_2px_0_#000] active:translate-y-0.5 active:shadow-none">
-              ⚠️ EMERGENCY STOP
+            <button
+              onClick={() => handleAction('stop')}
+              className="px-4 py-3 bg-rose-700/90 hover:bg-rose-600 text-white font-bold uppercase rounded-xl border border-rose-500/40 shadow-[0_0_15px_rgba(225,29,72,0.3)] transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+            >
+              <OctagonX className="w-4 h-4" /> Emergency Stop
             </button>
           </div>
         </section>
 
-        {/* Navigation Tabs */}
-        <div className="flex gap-4 border-b-2 border-slate-700 pb-2">
+        {/* Navigation Tabs Bar */}
+        <nav className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
           {[
-            { id: 'monitoring', label: 'Operations Monitoring' },
-            { id: 'leaderboard', label: 'Championship Leaderboard' },
-            { id: 'tactical', label: `Tactical Assistance (${helpRequests.filter(r => r.status === 'PENDING').length})` },
-            { id: 'analytics', label: 'Analytics & Telemetry' },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`px-4 py-2 font-mono text-xs font-bold uppercase border-2 transition-all ${
-                activeTab === tab.id
-                  ? 'bg-red-500 text-white border-black shadow-[2px_2px_0_#000]'
-                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-          {/* Demo Controls tab always shown */}
-          <button
-            onClick={() => setActiveTab('demo')}
-            className={`px-4 py-2 font-mono text-xs font-bold uppercase border-2 transition-all ${
-              activeTab === 'demo'
-                ? 'bg-yellow-500 text-black border-black shadow-[2px_2px_0_#000]'
-                : 'bg-yellow-900/40 text-yellow-400 border-yellow-700 hover:text-yellow-300'
-            }`}
-            id="demo-controls-tab"
-          >
-            ⚡ DEMO CONTROLS
-          </button>
-        </div>
+            { id: 'monitoring', label: 'Operations Monitoring', icon: Activity, badge: null },
+            { id: 'tactical', label: 'Tactical Assistance', icon: MessageSquare, badge: pendingRequestsCount > 0 ? pendingRequestsCount : null },
+            { id: 'leaderboard', label: 'Championship Leaderboard', icon: Trophy, badge: null },
+            { id: 'analytics', label: 'Analytics & Telemetry', icon: BarChart3, badge: null },
+            { id: 'demo', label: 'Demo Controls', icon: Zap, badge: null },
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-4 py-2.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
+                  isActive
+                    ? 'bg-red-600 text-white border-red-400/50 shadow-[0_0_15px_rgba(239,68,68,0.3)]'
+                    : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+                {tab.badge !== null && (
+                  <span className="bg-amber-400 text-black text-[10px] font-black px-1.5 py-0.2 rounded-full animate-bounce">
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
 
+        {/* TAB 1: Operations Monitoring */}
         {activeTab === 'monitoring' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Live Teams Grid */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-5 rounded-2xl shadow-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xs font-mono font-black tracking-widest text-slate-300 uppercase flex items-center gap-2">
+                    <Users className="w-4 h-4 text-sky-400" /> LIVE CONTESTANT TEAMS ({teams.length})
+                  </h3>
 
-            {/* Team Monitoring Column */}
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-slate-800 border-2 border-slate-700 p-5 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-                <h3 className="text-sm font-black tracking-widest text-slate-300 uppercase mb-4">LIVE TEAMS MONITORING</h3>
+                  <div className="relative w-48">
+                    <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search team..."
+                      value={searchFilter}
+                      onChange={e => setSearchFilter(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-sky-500"
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {teams.map(t => (
+                  {filteredTeams.map(t => (
                     <div
                       key={t.id}
-                      className={`border-2 p-4 bg-slate-900 shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex flex-col justify-between ${t.isDisqualified ? 'border-red-600 bg-red-950/20' : t.isPaused ? 'border-amber-500 bg-amber-950/20' : 'border-slate-700'}`}
+                      className={`border rounded-xl p-4 bg-slate-950/70 transition-all flex flex-col justify-between ${
+                        t.isDisqualified ? 'border-rose-600/80 bg-rose-950/20' :
+                        t.isPaused ? 'border-amber-500/80 bg-amber-950/20' :
+                        'border-slate-800 hover:border-slate-700'
+                      }`}
                     >
                       <div>
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
-                          <span className="font-bold text-sm tracking-wide text-white">{t.name}</span>
-                          <span className={`font-mono text-[9px] font-bold px-1.5 py-0.5 border ${t.isDisqualified ? 'bg-red-900 border-red-500 text-white' : t.isPaused ? 'bg-amber-900 border-amber-500 text-white' : 'bg-green-900 border-green-500 text-white'}`}>
-                            {t.isDisqualified ? 'DQ' : t.isPaused ? 'PAUSED' : 'ACTIVE'}
+                        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2 mb-3">
+                          <span className="font-bold text-sm text-white tracking-wide">{t.name}</span>
+                          <span className={`font-mono text-[9px] font-bold px-2 py-0.5 rounded border uppercase ${
+                            t.isDisqualified ? 'bg-rose-950 border-rose-500 text-rose-300' :
+                            t.isPaused ? 'bg-amber-950 border-amber-500 text-amber-300 animate-pulse' :
+                            'bg-emerald-950 border-emerald-500 text-emerald-300'
+                          }`}>
+                            {t.isDisqualified ? 'Disqualified' : t.isPaused ? 'Paused' : 'Active'}
                           </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-400 mt-2">
-                          <div>Solved: <span className="text-white font-bold">{t.solvedCount}</span></div>
-                          <div>Hint Stage: <span className="text-purple-400 font-bold">{t.hintStage}</span></div>
-                          <div>Strikes: <span className={`font-bold ${t.violationCount > 2 ? 'text-red-400 animate-pulse' : 'text-slate-200'}`}>{t.violationCount}/5</span></div>
-                          <div>Active: <span className="text-sky-400 font-bold">{t.currentProblemId.substring(0, 10)}</span></div>
-                        </div>
-                      </div>
-                      <div className="mt-4 flex gap-2 justify-end">
-                        {t.isPaused && !t.isDisqualified && (
-                          <button
-                            onClick={() => handleResumeTeam(t.id)}
-                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white font-mono text-[10px] font-bold uppercase border border-black shadow-[1px_1px_0_#000] active:translate-y-0.5 active:shadow-none"
-                          >
-                            Resume Team
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* Submissions Feed */}
-              <div className="bg-slate-800 border-2 border-slate-700 p-5 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-                <h3 className="text-sm font-black tracking-widest text-slate-300 uppercase mb-4">LIVE SUBMISSIONS FEED</h3>
-                <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
-                  {submissions.map(sub => (
-                    <div key={sub.id} className="border border-slate-700 bg-slate-900 p-3 flex justify-between items-center font-mono text-xs">
-                      <div>
-                        <div className="flex gap-2">
-                          <span className="font-bold text-white">{sub.teamId}</span>
-                          <span className="text-slate-500">submitted</span>
-                          <span className="text-sky-400 font-bold">{sub.problemId}</span>
-                        </div>
-                        <div className="text-[10px] text-slate-500 mt-1">
-                          Lang: {sub.language} • {new Date(sub.createdAt).toLocaleTimeString()}
+                        <div className="space-y-2 font-mono text-xs">
+                          <div className="flex justify-between text-slate-400">
+                            <span>Solved Missions:</span>
+                            <span className="text-emerald-400 font-bold">{t.solvedCount || 0} / 10</span>
+                          </div>
+                          <div className="flex justify-between text-slate-400">
+                            <span>Security Alerts:</span>
+                            <span className={`font-bold ${t.violationCount > 0 ? 'text-amber-400' : 'text-slate-300'}`}>
+                              {t.violationCount} / 5
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-slate-400">
+                            <span>Spider-Sense Charges:</span>
+                            <span className="text-yellow-400 font-bold">{t.spiderSenseCharges}</span>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex gap-3 items-center">
-                        <span className="text-[10px] text-slate-400">{sub.runtimeMs}ms</span>
-                        <span className={`border px-1.5 py-0.5 text-[10px] font-bold ${getVerdictBadge(sub.verdict)}`}>
-                          {sub.verdict}
-                        </span>
-                      </div>
+
+                      {t.isPaused && !t.isDisqualified && (
+                        <button
+                          onClick={() => handleResumeTeam(t.id)}
+                          className="mt-4 w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-mono text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer"
+                        >
+                          Unlock Team Terminal
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Side feeds */}
-            <div className="space-y-6">
-              <div className="bg-slate-800 border-2 border-slate-700 p-5 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-                <h3 className="text-sm font-black tracking-widest text-red-500 uppercase mb-4 flex items-center gap-2">⚠️ CHEAT DETECT ALERTS</h3>
-                <div className="space-y-3 max-h-[250px] overflow-y-auto">
-                  {violations.map((v, i) => (
-                    <div key={i} className="border-l-4 border-red-500 bg-red-950/20 p-2.5 font-mono text-[11px]">
-                      <div className="flex justify-between font-bold text-red-400">
-                        <span>{v.teamId}</span><span>{v.timestamp}</span>
-                      </div>
-                      <p className="text-slate-300 mt-1 uppercase text-[10px]">VIOLATION: {v.type}</p>
-                      {v.violationCount && <p className="text-slate-400 mt-0.5 text-[9px]">Strike Count: {v.violationCount}/5</p>}
-                    </div>
-                  ))}
-                  {violations.length === 0 && <div className="text-center py-6 text-zinc-500 font-mono text-xs">No violations detected.</div>}
-                </div>
-              </div>
-
-              <div className="bg-slate-800 border-2 border-slate-700 p-5 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-                <h3 className="text-sm font-black tracking-widest text-yellow-500 uppercase mb-4">⚡ POWERUP CONSUMPTION LOG</h3>
-                <div className="space-y-3 max-h-[250px] overflow-y-auto">
-                  {powerups.map((p, i) => (
-                    <div key={i} className="border-l-4 border-yellow-500 bg-yellow-950/10 p-2.5 font-mono text-[11px]">
-                      <div className="flex justify-between font-bold text-yellow-500">
-                        <span>{p.teamId}</span><span>{p.timestamp}</span>
-                      </div>
-                      <p className="text-slate-300 mt-1 uppercase text-[10px]">Activated: {p.type}</p>
-                    </div>
-                  ))}
-                  {powerups.length === 0 && <div className="text-center py-6 text-zinc-500 font-mono text-xs">No powerups activated.</div>}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'leaderboard' && (
-          <div className="bg-slate-800 border-2 border-slate-700 p-6 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-            <h3 className="text-sm font-black tracking-widest text-slate-300 uppercase mb-4">CHAMPIONSHIP LEADERBOARD</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full font-mono text-xs border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-slate-700 text-slate-400 text-left">
-                    <th className="pb-3 font-bold uppercase">Rank</th>
-                    <th className="pb-3 font-bold uppercase">Team Name</th>
-                    <th className="pb-3 font-bold uppercase text-center">Solves / Bypasses</th>
-                    <th className="pb-3 font-bold uppercase text-center">Submissions</th>
-                    <th className="pb-3 font-bold uppercase text-center">Penalty</th>
-                    <th className="pb-3 font-bold uppercase text-right">Current Activity</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {teams
-                    .slice()
-                    .sort((a, b) => b.solvedCount - a.solvedCount || (a.penalty ?? 0) - (b.penalty ?? 0))
-                    .map((t, idx) => (
-                      <tr key={t.id} className="border-b border-slate-800/60 hover:bg-slate-900/40 transition-colors">
-                        <td className="py-3.5 font-black text-slate-400 text-sm">#{idx + 1}</td>
-                        <td className="py-3.5 font-bold text-white text-sm">{t.name}</td>
-                        <td className="py-3.5 text-center font-black text-sm">
-                          <span className="text-green-400">{t.legitimateSolvedCount ?? t.solvedCount}</span>
-                          <span className="text-slate-500 mx-1">/</span>
-                          <span className="text-orange-400">{t.bypassedCount ?? 0}</span>
-                        </td>
-                        <td className="py-3.5 text-center text-slate-300">{t.submissionCount || 0}</td>
-                        <td className="py-3.5 text-center text-red-400 font-bold">{t.penalty || 0} pts</td>
-                        <td className="py-3.5 text-right font-semibold text-slate-400">
-                          {t.isDisqualified ? <span className="text-red-500 font-bold uppercase">Disqualified</span>
-                            : t.isPaused ? <span className="text-amber-500 font-bold uppercase">Locked Out</span>
-                              : <span className="text-sky-400">{t.latestVerdict !== 'none' ? `Verdict: ${t.latestVerdict} (${t.currentProblemId.substring(0, 10)})` : 'Active'}</span>}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'tactical' && (
-          <div className="bg-slate-800 border-2 border-slate-700 p-6 shadow-[4px_4px_0_0_rgba(0,0,0,1)] space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-700 pb-3">
-              <div>
-                <h3 className="text-base font-black tracking-widest text-sky-400 uppercase">
-                  📡 TACTICAL ASSISTANCE QUEUE (SPIDER-COMMS)
+            {/* Feeds Column: Security & Powerups */}
+            <div className="space-y-4">
+              {/* Security Violation Alerts Feed */}
+              <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-5 rounded-2xl shadow-lg">
+                <h3 className="text-xs font-mono font-black tracking-widest text-slate-300 uppercase mb-3 flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-amber-500" /> ANTI-CHEAT ALERTS
                 </h3>
-                <p className="font-mono text-xs text-slate-400 mt-0.5">
-                  Direct Organizer-to-Contestant Hint Relay & Intel Dispatch
+
+                <div className="space-y-2 max-h-56 overflow-y-auto font-mono text-xs">
+                  {violations.length === 0 ? (
+                    <p className="text-slate-500 text-center py-4">No violations logged.</p>
+                  ) : (
+                    violations.map((v, idx) => (
+                      <div key={idx} className="bg-amber-950/30 border border-amber-500/40 p-2.5 rounded-lg flex justify-between items-center text-amber-200">
+                        <div>
+                          <div className="font-bold">{v.teamId}</div>
+                          <div className="text-[10px] text-amber-400/80">{v.type}</div>
+                        </div>
+                        <span className="text-[10px] text-slate-400">{v.timestamp}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Powerup Activity Log */}
+              <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-5 rounded-2xl shadow-lg">
+                <h3 className="text-xs font-mono font-black tracking-widest text-slate-300 uppercase mb-3 flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-yellow-400" /> POWERUP DISPATCH LOG
+                </h3>
+
+                <div className="space-y-2 max-h-56 overflow-y-auto font-mono text-xs">
+                  {powerups.length === 0 ? (
+                    <p className="text-slate-500 text-center py-4">No powerups activated.</p>
+                  ) : (
+                    powerups.map((p, idx) => (
+                      <div key={idx} className="bg-slate-950 border border-slate-800 p-2.5 rounded-lg flex justify-between items-center">
+                        <div>
+                          <div className="font-bold text-white">{p.teamId}</div>
+                          <div className="text-[10px] text-yellow-400 font-bold">
+                            {p.type} {p.freezeDurationMs ? '(60s Time Freeze)' : ''}
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-slate-400">{p.timestamp}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB 2: Tactical Assistance Queue (Suit Tech Spider-Comms) */}
+        {activeTab === 'tactical' && (
+          <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-6 rounded-2xl shadow-lg space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-base font-black tracking-widest text-sky-400 uppercase flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5" /> TACTICAL ASSISTANCE QUEUE (SPIDER-COMMS)
+                </h3>
+                <p className="font-mono text-xs text-slate-400 mt-1">
+                  Direct Organizer Tactical Advice & Hint Dispatch Engine
                 </p>
               </div>
+
               <div className="flex items-center gap-3 font-mono text-xs font-bold">
-                <span className="bg-amber-950 border border-amber-500 text-amber-300 px-3 py-1">
-                  PENDING QUEUE: {helpRequests.filter(r => r.status === 'PENDING').length}
+                <span className="bg-amber-950/80 border border-amber-500/60 text-amber-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                  PENDING: {pendingRequestsCount}
                 </span>
-                <span className="bg-green-950 border border-green-500 text-green-300 px-3 py-1">
+                <span className="bg-emerald-950/80 border border-emerald-500/60 text-emerald-300 px-3 py-1.5 rounded-xl">
                   ANSWERED: {helpRequests.filter(r => r.status === 'ANSWERED').length}
                 </span>
               </div>
             </div>
 
             {helpRequests.length === 0 ? (
-              <div className="bg-slate-900 border border-slate-700 p-8 text-center text-slate-400 font-mono text-xs">
-                No tactical assistance requests received yet.
+              <div className="bg-slate-950 border border-slate-800 p-12 text-center text-slate-500 font-mono text-xs rounded-xl">
+                No tactical assistance requests received from teams yet.
               </div>
             ) : (
               <div className="space-y-4">
                 {helpRequests.map((req) => (
                   <div
                     key={req.id}
-                    className={`border-2 p-5 bg-slate-900 shadow-[3px_3px_0_0_rgba(0,0,0,1)] flex flex-col gap-3 ${
-                      req.status === 'PENDING' ? 'border-sky-500 bg-sky-950/20' : 'border-slate-700'
+                    className={`border-2 p-5 rounded-2xl bg-slate-950/80 shadow-md flex flex-col gap-3.5 transition-all ${
+                      req.status === 'PENDING' ? 'border-sky-500/80 bg-sky-950/15' : 'border-slate-800'
                     }`}
                   >
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
                       <div className="flex items-center gap-3 font-mono">
                         <span className="text-white font-bold text-sm">{req.teamName || req.teamId}</span>
-                        <span className="bg-slate-800 text-sky-300 border border-sky-500/40 text-[10px] px-2 py-0.5 font-bold uppercase">
+                        <span className="bg-slate-900 border border-sky-500/40 text-sky-300 text-[10px] px-2.5 py-0.5 rounded-lg font-bold uppercase">
                           TARGET MISSION: {req.problemTitle || req.problemId}
                         </span>
                       </div>
+
                       <div className="flex items-center gap-3 font-mono text-xs">
                         <span className="text-slate-400">
                           {req.createdAt ? new Date(req.createdAt).toLocaleTimeString() : 'Just now'}
                         </span>
-                        <span
-                          className={`font-bold px-2 py-0.5 border text-[10px] uppercase ${
-                            req.status === 'PENDING'
-                              ? 'bg-amber-900 border-amber-500 text-amber-200 animate-pulse'
-                              : 'bg-green-900 border-green-500 text-green-200'
-                          }`}
-                        >
+                        <span className={`font-bold px-2.5 py-0.5 rounded-md border text-[10px] uppercase ${
+                          req.status === 'PENDING' ? 'bg-amber-950 border-amber-500 text-amber-300 animate-pulse' :
+                          'bg-emerald-950 border-emerald-500 text-emerald-300'
+                        }`}>
                           {req.status}
                         </span>
                       </div>
@@ -622,16 +672,18 @@ export default function App() {
 
                     {req.status === 'PENDING' ? (
                       <div className="space-y-3 pt-1">
-                        <div className="font-mono text-xs text-amber-300">
-                          💬 Contestant requested tactical advice for <span className="font-bold text-white">{req.problemTitle || req.problemId}</span>. Type response below:
+                        <div className="font-mono text-xs text-amber-300/90 flex items-center gap-1.5">
+                          <Flame className="w-4 h-4 text-amber-400 animate-bounce" />
+                          Contestant team requested tactical guidance for <span className="font-bold text-white">{req.problemTitle || req.problemId}</span>:
                         </div>
-                        <div className="flex gap-3">
+
+                        <div className="flex flex-col sm:flex-row gap-3">
                           <input
                             type="text"
-                            placeholder="Type tactical hint or code advice..."
+                            placeholder="Type custom hint or tactical code guidance..."
                             value={hintInputs[req.id] || ''}
                             onChange={(e) => setHintInputs(prev => ({ ...prev, [req.id]: e.target.value }))}
-                            className="flex-1 bg-slate-950 border border-slate-700 p-2.5 text-xs text-white font-mono focus:outline-none focus:border-sky-400"
+                            className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-sky-400"
                           />
                           <button
                             onClick={() => {
@@ -647,14 +699,14 @@ export default function App() {
                                 setHintInputs(prev => ({ ...prev, [req.id]: '' }));
                               }
                             }}
-                            className="px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-black font-mono text-xs font-black uppercase border-2 border-black shadow-[2px_2px_0_#000] active:translate-y-0.5 active:shadow-none cursor-pointer"
+                            className="px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-black font-mono text-xs font-black uppercase rounded-xl border border-sky-300 shadow-[0_0_15px_rgba(14,165,233,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
                           >
-                            Send Tactical Intel
+                            <Send className="w-3.5 h-3.5" /> Send Tactical Intel
                           </button>
                         </div>
                       </div>
                     ) : (
-                      <div className="bg-slate-950 border border-slate-800 p-3 font-mono text-xs space-y-1">
+                      <div className="bg-slate-900/90 border border-slate-800 p-3.5 rounded-xl font-mono text-xs space-y-1.5">
                         <div className="flex justify-between text-slate-400 text-[10px]">
                           <span>DISPATCHED BY: {req.answeredBy || 'HQ Admin'}</span>
                           <span>{req.answeredAt ? new Date(req.answeredAt).toLocaleTimeString() : ''}</span>
@@ -669,228 +721,163 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'analytics' && analytics && (
-          <div className="bg-slate-800 border-2 border-slate-700 p-6 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-            <h3 className="text-sm font-black tracking-widest text-slate-300 uppercase mb-4">CONTEST ANALYTICS & TELEMETRY</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              
-              {/* Question Stats */}
-              <div className="bg-slate-900 border border-slate-700 p-4 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 border-b border-slate-700 pb-1">Missions</h4>
-                <div className="space-y-3 font-mono text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Most Solved</span>
-                    <span className="text-green-400 font-bold truncate max-w-[120px] ml-2">{analytics.mostSolvedQuestion}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Most Bypassed</span>
-                    <span className="text-yellow-400 font-bold truncate max-w-[120px] ml-2">{analytics.mostBypassedQuestion}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Most Failed</span>
-                    <span className="text-red-400 font-bold truncate max-w-[120px] ml-2">{analytics.mostFailedQuestion}</span>
-                  </div>
-                  {analytics.mostRequestedMission && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Most Requested</span>
-                      <span className="text-sky-400 font-bold truncate max-w-[120px] ml-2">{analytics.mostRequestedMission}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+        {/* TAB 3: Championship Leaderboard */}
+        {activeTab === 'leaderboard' && (
+          <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-6 rounded-2xl shadow-lg space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-black tracking-widest text-slate-200 uppercase flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-yellow-400" /> OFFICIAL CHAMPIONSHIP LEADERBOARD
+              </h3>
+              <span className="font-mono text-xs text-slate-400">Total Teams: {teams.length}</span>
+            </div>
 
-              {/* Performance Stats */}
-              <div className="bg-slate-900 border border-slate-700 p-4 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 border-b border-slate-700 pb-1">Performance</h4>
-                <div className="space-y-3 font-mono text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Avg Runtime</span>
-                    <span className="text-sky-400 font-bold">{analytics.averageRuntime} ms</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Avg Memory</span>
-                    <span className="text-purple-400 font-bold">{analytics.averageMemory} KB</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Fastest Solve</span>
-                    <span className="text-white font-bold">{analytics.fastestSolve} ms</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Powerup Usage Breakdown */}
-              <div className="bg-slate-900 border border-slate-700 p-4 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 border-b border-slate-700 pb-1">Powerups</h4>
-                <div className="space-y-3 font-mono text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Spider-Sense</span>
-                    <span className="text-yellow-400 font-bold">{analytics.spiderSenseUsage}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Web-Fluid (Freeze)</span>
-                    <span className="text-sky-400 font-bold">{analytics.webFluidUsage || 0}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Suit Tech (Comms)</span>
-                    <span className="text-purple-400 font-bold">{analytics.suitTechUsage || 0}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-slate-800 pt-1">
-                    <span className="text-slate-400">Total Powerups</span>
-                    <span className="text-white font-bold">{analytics.totalPowerupUsage}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Spider-Comms Telemetry */}
-              <div className="bg-slate-900 border border-slate-700 p-4 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 border-b border-slate-700 pb-1">Tactical Comms</h4>
-                <div className="space-y-3 font-mono text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Total Requests</span>
-                    <span className="text-sky-400 font-bold">{analytics.totalHintRequests || 0}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Hints Dispatched</span>
-                    <span className="text-green-400 font-bold">{analytics.hintsSent || 0}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Avg Response</span>
-                    <span className="text-white font-bold">{analytics.averageResponseTimeSec || 0}s</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Security Stats */}
-              <div className="bg-slate-900 border border-slate-700 p-4 shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex flex-col justify-between">
-                <div>
-                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 border-b border-slate-700 pb-1">Security</h4>
-                  <div className="font-mono text-xs text-center py-2">
-                    <div className="text-slate-400 uppercase mb-1">Cheat Alerts</div>
-                    <div className={`text-2xl font-black ${analytics.violationCount > 10 ? 'text-red-500 animate-pulse' : 'text-slate-300'}`}>{analytics.violationCount}</div>
-                  </div>
-                </div>
-              </div>
-
+            <div className="overflow-x-auto">
+              <table className="w-full font-mono text-xs text-left">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                    <th className="py-3 px-2">Rank</th>
+                    <th className="py-3 px-2">Team Name</th>
+                    <th className="py-3 px-2 text-center">Solved</th>
+                    <th className="py-3 px-2 text-center">Penalty</th>
+                    <th className="py-3 px-2 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {teams
+                    .sort((a, b) => (b.solvedCount || 0) - (a.solvedCount || 0) || (a.penalty || 0) - (b.penalty || 0))
+                    .map((t, idx) => (
+                      <tr key={t.id} className="hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3.5 px-2 font-bold">
+                          {idx === 0 ? '🥇 1st' : idx === 1 ? '🥈 2nd' : idx === 2 ? '🥉 3rd' : `#${idx + 1}`}
+                        </td>
+                        <td className="py-3.5 px-2 font-bold text-white">{t.name}</td>
+                        <td className="py-3.5 px-2 text-center text-emerald-400 font-bold">{t.solvedCount || 0} / 10</td>
+                        <td className="py-3.5 px-2 text-center text-rose-400 font-bold">{t.penalty || 0} pts</td>
+                        <td className="py-3.5 px-2 text-right">
+                          <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-bold ${
+                            t.isDisqualified ? 'bg-rose-950 border-rose-500 text-rose-300' :
+                            t.isPaused ? 'bg-amber-950 border-amber-500 text-amber-300' :
+                            'bg-emerald-950 border-emerald-500 text-emerald-300'
+                          }`}>
+                            {t.isDisqualified ? 'Disqualified' : t.isPaused ? 'Paused' : 'Active'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
-        {/* ── DEMO CONTROLS TAB ── */}
-        {activeTab === 'demo' && (
-          <div className="space-y-6">
+        {/* TAB 4: Analytics & Telemetry */}
+        {activeTab === 'analytics' && analytics && (
+          <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-6 rounded-2xl shadow-lg space-y-6">
+            <h3 className="text-sm font-black tracking-widest text-slate-200 uppercase flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-sky-400" /> CONTEST ANALYTICS & TELEMETRY
+            </h3>
 
-            {/* Demo mode disabled banner */}
-            {!demoModeEnabled && (
-              <div className="border-2 border-amber-600 bg-amber-950/30 p-5 font-mono text-sm text-amber-400">
-                <div className="font-black uppercase tracking-widest mb-2">⚠️ DEMO MODE IS DISABLED</div>
-                <div className="text-xs text-amber-300">
-                  Set <code className="bg-black/40 px-1.5 py-0.5 rounded">DEMO_MODE=true</code> in{' '}
-                  <code className="bg-black/40 px-1.5 py-0.5 rounded">apps/backend/.env</code> then restart the backend.
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-xl space-y-3 font-mono text-xs">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 pb-1">Missions Breakdown</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between"><span className="text-slate-400">Most Solved:</span> <span className="text-emerald-400 font-bold">{analytics.mostSolvedQuestion}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Most Bypassed:</span> <span className="text-yellow-400 font-bold">{analytics.mostBypassedQuestion}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Most Failed:</span> <span className="text-rose-400 font-bold">{analytics.mostFailedQuestion}</span></div>
+                  {analytics.mostRequestedMission && (
+                    <div className="flex justify-between"><span className="text-slate-400">Most Requested:</span> <span className="text-sky-400 font-bold">{analytics.mostRequestedMission}</span></div>
+                  )}
                 </div>
               </div>
-            )}
 
-            {/* Status bar */}
+              <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-xl space-y-3 font-mono text-xs">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 pb-1">Performance Metrics</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between"><span className="text-slate-400">Total Submissions:</span> <span className="text-white font-bold">{submissions.length}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Avg Runtime:</span> <span className="text-sky-400 font-bold">{analytics.averageRuntime} ms</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Avg Memory:</span> <span className="text-purple-400 font-bold">{analytics.averageMemory} KB</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Fastest Solve:</span> <span className="text-white font-bold">{analytics.fastestSolve} ms</span></div>
+                </div>
+              </div>
+
+              <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-xl space-y-3 font-mono text-xs">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 pb-1">Powerup Usage</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between"><span className="text-slate-400">Spider-Sense:</span> <span className="text-yellow-400 font-bold">{analytics.spiderSenseUsage}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Web-Fluid:</span> <span className="text-sky-400 font-bold">{analytics.webFluidUsage || 0}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Suit Tech:</span> <span className="text-purple-400 font-bold">{analytics.suitTechUsage || 0}</span></div>
+                </div>
+              </div>
+
+              <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-xl space-y-3 font-mono text-xs">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 pb-1">Spider-Comms Intel</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between"><span className="text-slate-400">Total Requests:</span> <span className="text-sky-400 font-bold">{analytics.totalHintRequests || 0}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Hints Sent:</span> <span className="text-emerald-400 font-bold">{analytics.hintsSent || 0}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Avg Response:</span> <span className="text-white font-bold">{analytics.averageResponseTimeSec || 0}s</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: Demo Controls */}
+        {activeTab === 'demo' && (
+          <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-6 rounded-2xl shadow-lg space-y-6">
+            <h3 className="text-sm font-black tracking-widest text-yellow-400 uppercase flex items-center gap-2">
+              <Zap className="w-4 h-4 text-yellow-400" /> DEMO CONTROLS & PRESENTATION SUITE
+            </h3>
+
             {demoStatus && (
-              <div className={`border-2 p-3 font-mono text-xs ${demoStatus.startsWith('✓') ? 'border-green-600 bg-green-950/30 text-green-400' : 'border-red-600 bg-red-950/30 text-red-400'}`}>
+              <div className={`p-3.5 rounded-xl font-mono text-xs border ${
+                demoStatus.startsWith('✓') ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300' : 'bg-rose-950/80 border-rose-500 text-rose-300'
+              }`}>
                 {demoStatus}
               </div>
             )}
 
-            {/* Team selector */}
-            <div className="bg-slate-800 border-2 border-yellow-700 p-5 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-              <h3 className="text-sm font-black tracking-widest text-yellow-400 uppercase mb-4">
-                ⚡ DEMO CONTROLS — FOR PRESENTATIONS ONLY
-              </h3>
-              <div className="flex items-center gap-4 mb-2">
-                <label className="text-xs font-mono text-slate-400 uppercase tracking-widest">Active Team:</label>
-                <select
-                  value={selectedDemoTeam}
-                  onChange={e => setSelectedDemoTeam(e.target.value)}
-                  className="bg-slate-900 border-2 border-slate-600 text-white font-mono text-xs px-3 py-1.5 focus:border-yellow-500 outline-none"
-                  id="demo-team-selector"
-                >
-                  {demoTeams.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                  {teams
-                    .filter(t => !demoTeams.find(d => d.id === t.id))
-                    .map(t => (
-                      <option key={t.id} value={t.id}>{t.name} (real)</option>
-                    ))}
-                </select>
-              </div>
-              <p className="text-[10px] text-slate-500 font-mono">
-                All actions use real backend endpoints. Nothing is faked on the frontend.
-              </p>
+            <div className="flex items-center gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <label className="text-xs font-mono text-slate-400 uppercase tracking-wider font-bold">Target Team:</label>
+              <select
+                value={selectedDemoTeam}
+                onChange={e => setSelectedDemoTeam(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-white font-mono text-xs px-4 py-2 rounded-lg focus:outline-none focus:border-yellow-500"
+              >
+                {demoTeams.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
             </div>
 
-            {/* Progression controls */}
-            <div className="bg-slate-800 border-2 border-slate-700 p-5 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-              <h4 className="text-xs font-black tracking-widest text-green-400 uppercase mb-4">📈 PROGRESSION SIMULATOR</h4>
-              <div className="flex flex-wrap gap-3">
-                <DemoButton label="Solve Current" icon="✅" color="green"
-                  onClick={() => demoAction('solve-current', { teamId: selectedDemoTeam }, 'Solve Current')} />
-                <DemoButton label="Solve Next" icon="⏭" color="green"
-                  onClick={() => demoAction('solve-next', { teamId: selectedDemoTeam }, 'Solve Next')} />
-                <DemoButton label="Solve ALL" icon="💯" color="green"
-                  onClick={() => demoAction('solve-all', { teamId: selectedDemoTeam }, 'Solve ALL')} />
-                <DemoButton label="Reset Team" icon="🔄" color="red"
-                  onClick={() => demoAction('reset-team', { teamId: selectedDemoTeam }, 'Reset Team')} />
-              </div>
-            </div>
-
-            {/* Hint controls */}
-            <div className="bg-slate-800 border-2 border-slate-700 p-5 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-              <h4 className="text-xs font-black tracking-widest text-purple-400 uppercase mb-4">🗺 HINT PROGRESSION</h4>
-              <div className="flex flex-wrap gap-3">
-                <DemoButton label="Unlock Stage 1" icon="🔓" color="purple"
-                  onClick={() => demoAction('set-hint-stage', { teamId: selectedDemoTeam, stage: 1 }, 'Unlock Stage 1')} />
-                <DemoButton label="Unlock Stage 2" icon="🔓" color="purple"
-                  onClick={() => demoAction('set-hint-stage', { teamId: selectedDemoTeam, stage: 2 }, 'Unlock Stage 2')} />
-                <DemoButton label="Unlock Final Hint" icon="⚡" color="purple"
-                  onClick={() => demoAction('set-hint-stage', { teamId: selectedDemoTeam, stage: 3 }, 'Unlock Final Hint')} />
-                <DemoButton label="Reset Hints" icon="🔒" color="red"
-                  onClick={() => demoAction('reset-hints', { teamId: selectedDemoTeam }, 'Reset Hints')} />
-              </div>
-            </div>
-
-            {/* Verdict triggers */}
-            <div className="bg-slate-800 border-2 border-slate-700 p-5 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-              <h4 className="text-xs font-black tracking-widest text-sky-400 uppercase mb-4">⚖️ VERDICT SIMULATOR</h4>
-              <div className="flex flex-wrap gap-3">
-                <DemoButton label="Trigger AC" icon="✅" color="green"
-                  onClick={() => demoAction('trigger-verdict', { teamId: selectedDemoTeam, verdict: 'AC' }, 'Trigger AC')} />
-                <DemoButton label="Trigger WA" icon="❌" color="amber"
-                  onClick={() => demoAction('trigger-verdict', { teamId: selectedDemoTeam, verdict: 'WA' }, 'Trigger WA')} />
-                <DemoButton label="Trigger CE" icon="🔧" color="amber"
-                  onClick={() => demoAction('trigger-verdict', { teamId: selectedDemoTeam, verdict: 'CE' }, 'Trigger CE')} />
-                <DemoButton label="Trigger RE" icon="💥" color="red"
-                  onClick={() => demoAction('trigger-verdict', { teamId: selectedDemoTeam, verdict: 'RE' }, 'Trigger RE')} />
-              </div>
-            </div>
-
-            {/* Orchestration */}
-            <div className="bg-slate-800 border-2 border-slate-700 p-5 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-              <h4 className="text-xs font-black tracking-widest text-amber-400 uppercase mb-4">🎭 DEMO ORCHESTRATION</h4>
-              <div className="flex flex-wrap gap-3">
-                <DemoButton label="Populate Leaderboard" icon="🏆" color="blue"
-                  onClick={() => demoAction('populate-leaderboard', {}, 'Populate Leaderboard')} />
-                <DemoButton label="Generate Activity" icon="📡" color="blue"
-                  onClick={() => demoAction('generate-activity', {}, 'Generate Activity')} />
-                <DemoButton label="Simulate Violation" icon="⚠️" color="red"
-                  onClick={() => demoAction('simulate-violation', { teamId: selectedDemoTeam, type: 'TAB_SWITCH' }, 'Simulate Violation')} />
-                <DemoButton label="Trigger Powerup" icon="🕷" color="amber"
-                  onClick={() => demoAction('trigger-powerup', { teamId: selectedDemoTeam, type: 'SPIDER_SENSE' }, 'Trigger Powerup')} />
-                <DemoButton label="Reset Demo Contest" icon="🚨" color="red"
-                  onClick={() => demoAction('reset-contest', {}, 'Reset Demo Contest')} />
-              </div>
-            </div>
-
-            {/* Warning */}
-            <div className="border-2 border-dashed border-red-800 p-4 text-xs font-mono text-red-700 bg-red-950/10">
-              ⚠ DEMO MODE — All actions write to the real database and trigger real Socket.IO events.
-              Set DEMO_MODE=false and restart backend before any real contest.
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs">
+              <button
+                disabled={Boolean(demoLoading)}
+                onClick={() => demoAction('solve-current', { teamId: selectedDemoTeam }, 'Solve Current')}
+                className="p-3 bg-emerald-600/80 hover:bg-emerald-500 text-white font-bold rounded-xl border border-emerald-400/40 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {demoLoading === 'Solve Current' ? 'Executing...' : 'Solve Current Mission'}
+              </button>
+              <button
+                disabled={Boolean(demoLoading)}
+                onClick={() => demoAction('solve-next', { teamId: selectedDemoTeam }, 'Solve Next')}
+                className="p-3 bg-emerald-600/80 hover:bg-emerald-500 text-white font-bold rounded-xl border border-emerald-400/40 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {demoLoading === 'Solve Next' ? 'Executing...' : 'Solve Next Mission'}
+              </button>
+              <button
+                disabled={Boolean(demoLoading)}
+                onClick={() => demoAction('trigger-powerup', { teamId: selectedDemoTeam, type: 'WEB_FLUID' }, 'Trigger Web-Fluid')}
+                className="p-3 bg-sky-600/80 hover:bg-sky-500 text-white font-bold rounded-xl border border-sky-400/40 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {demoLoading === 'Trigger Web-Fluid' ? 'Executing...' : 'Trigger Web-Fluid (Freeze)'}
+              </button>
+              <button
+                disabled={Boolean(demoLoading)}
+                onClick={() => demoAction('simulate-violation', { teamId: selectedDemoTeam, type: 'TAB_SWITCH' }, 'Simulate Violation')}
+                className="p-3 bg-rose-600/80 hover:bg-rose-500 text-white font-bold rounded-xl border border-rose-400/40 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {demoLoading === 'Simulate Violation' ? 'Executing...' : 'Simulate Security Violation'}
+              </button>
             </div>
           </div>
         )}
