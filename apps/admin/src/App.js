@@ -2,9 +2,10 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
-const API_URL = 'http://localhost:3001/admin';
-const DEMO_URL = 'http://localhost:3001/demo';
-const SOCKET_URL = 'http://localhost:3001';
+const BACKEND = import.meta.env.VITE_API_URL || 'https://campus-quest-backend-mspi.onrender.com';
+const API_URL = `${BACKEND}/admin`;
+const DEMO_URL = `${BACKEND}/demo`;
+const SOCKET_URL = BACKEND;
 export default function App() {
     const [teams, setTeams] = useState([]);
     const [submissions, setSubmissions] = useState([]);
@@ -35,13 +36,13 @@ export default function App() {
     // Fetch initial state
     const fetchData = useCallback(async () => {
         try {
-            const teamsRes = await axios.get(`http://localhost:3001/admin/teams`);
+            const teamsRes = await axios.get(`${BACKEND}/admin/teams`);
             setTeams(teamsRes.data);
-            const subsRes = await axios.get(`http://localhost:3001/admin/submissions`);
+            const subsRes = await axios.get(`${BACKEND}/admin/submissions`);
             setSubmissions(subsRes.data);
-            const analyticsRes = await axios.get(`http://localhost:3001/admin/analytics`);
+            const analyticsRes = await axios.get(`${BACKEND}/admin/analytics`);
             setAnalytics(analyticsRes.data);
-            const statusRes = await axios.get(`http://localhost:3001/admin/contest-status`);
+            const statusRes = await axios.get(`${BACKEND}/admin/contest-status`);
             setContestStatus(statusRes.data?.status || 'NOT_STARTED');
         }
         catch (err) {

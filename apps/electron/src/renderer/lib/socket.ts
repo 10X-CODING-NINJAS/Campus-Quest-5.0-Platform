@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 
 // M1: Configurable API base — falls back to localhost for dev
-export const API_BASE = (window as any).__CQ_API_URL__ || 'http://localhost:3001';
+export const API_BASE = (window as any).__CQ_API_URL__ || import.meta.env.VITE_API_URL || 'https://campus-quest-backend-mspi.onrender.com';
 
 /**
  * Single socket instance for the entire app lifetime.
