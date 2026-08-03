@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 
-const BACKEND = import.meta.env.VITE_API_URL || 'https://campus-quest-backend-mspi.onrender.com';
+const BACKEND = (import.meta as any).env?.VITE_API_URL || 'https://campus-quest-backend-mspi.onrender.com';
 const API_URL = `${BACKEND}/admin`;
 const DEMO_URL = `${BACKEND}/demo`;
 const SOCKET_URL = BACKEND;
@@ -125,7 +125,7 @@ export default function App() {
     // Load both demo teams AND test teams into the selector
     Promise.all([
       axios.get(`${DEMO_URL}/teams`).catch(() => ({ data: [] })),
-      axios.get('http://localhost:3001/api/test-teams').catch(() => ({ data: [] })),
+      axios.get(`${BACKEND}/api/test-teams`).catch(() => ({ data: [] })),
     ]).then(([demoRes, testRes]) => {
       // Test teams come first (these are the real login accounts)
       const testList = (testRes.data as any[]).map((t: any) => ({ id: t.id, name: `${t.name} (test)`, email: '' }));
