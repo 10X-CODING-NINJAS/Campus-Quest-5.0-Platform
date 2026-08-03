@@ -1,0 +1,30 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { motion, AnimatePresence } from 'framer-motion';
+import spideySenseBase from '../../Assets/SpideySenseBase.png';
+import spideySenseUsage from '../../Assets/Spidey sense usage.png';
+export default function SpideySenseModal({ isOpen, onClose, onUse }) {
+    if (!isOpen)
+        return null;
+    return (_jsx(AnimatePresence, { children: _jsxs("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4", children: [_jsx("style", { dangerouslySetInnerHTML: { __html: `
+          @keyframes erratic-shake-extreme {
+            0% { transform: translate(0, 0) scale(1.15) rotate(0deg); }
+            10% { transform: translate(-7px, 5px) scale(1.15) rotate(-2deg); }
+            20% { transform: translate(6px, -7px) scale(1.15) rotate(3deg); }
+            30% { transform: translate(-3px, -5px) scale(1.15) rotate(-1.5deg); }
+            40% { transform: translate(7px, 3px) scale(1.15) rotate(2deg); }
+            50% { transform: translate(-5px, 7px) scale(1.15) rotate(-3.5deg); }
+            60% { transform: translate(4px, -3px) scale(1.15) rotate(1.5deg); }
+            70% { transform: translate(-7px, -5px) scale(1.15) rotate(3deg); }
+            80% { transform: translate(6px, 7px) scale(1.15) rotate(-2deg); }
+            90% { transform: translate(-3px, 3px) scale(1.15) rotate(1.5deg); }
+            100% { transform: translate(0, 0) scale(1.15) rotate(0deg); }
+          }
+          .animate-erratic-shake-extreme {
+            animation: erratic-shake-extreme 0.08s infinite;
+          }
+        ` } }), _jsx(motion.div, { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, onClick: onClose, className: "absolute inset-0 bg-black/60 backdrop-blur-[6px] cursor-pointer" }), _jsxs(motion.div, { initial: { scale: 0.8, opacity: 0 }, animate: { scale: 1, opacity: 1 }, exit: { scale: 0.8, opacity: 0 }, className: "relative w-[92vw] max-w-[1150px] aspect-[1536/1024] bg-transparent z-10", children: [_jsx("div", { className: "absolute inset-0 animate-erratic-shake-extreme pointer-events-none transform origin-center", children: _jsx("img", { src: spideySenseBase, alt: "Spidey Sense Base", className: "w-full h-full object-contain select-none" }) }), _jsx("div", { className: "absolute inset-0 pointer-events-none transform scale-100 origin-center", children: _jsx("img", { src: spideySenseUsage, alt: "Spidey Sense Usage", className: "w-full h-full object-contain select-none" }) }), _jsxs("div", { className: "absolute top-[50%] left-[20%] right-[20%] bg-[#05050d] border-4 border-[#ef4444] p-4 text-center shadow-[4px_4px_0_#ef4444] z-20", children: [_jsx("h2", { className: "font-display font-black text-2xl text-[#ef4444] mb-2 uppercase tracking-widest", children: "Establish Alternative Route" }), _jsxs("p", { className: "font-sans text-sm text-white font-bold leading-relaxed", children: ["Activate Spider-Sense to bypass this mission and uncover an alternate path.", _jsx("br", {}), _jsx("span", { className: "text-[#fde047]", children: "WARNING: This action cannot be undone. No fragments will be awarded." })] })] }), _jsxs("div", { className: "absolute top-[65%] left-[20%] right-[20%] h-[13%] flex gap-[2%] z-30", children: [_jsx("button", { onClick: onClose, type: "button", className: "flex-1 h-full cursor-pointer bg-transparent", title: "CANCEL", "aria-label": "Cancel" }), _jsx("button", { onClick: () => {
+                                        onUse?.();
+                                        onClose();
+                                    }, type: "button", className: "flex-[1.2] h-full cursor-pointer bg-transparent", title: "ESTABLISH ROUTE", "aria-label": "Establish Route" })] })] })] }) }));
+}
+//# sourceMappingURL=SpideySenseModal.js.map

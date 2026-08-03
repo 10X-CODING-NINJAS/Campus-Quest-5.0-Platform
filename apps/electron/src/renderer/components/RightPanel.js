@@ -1,0 +1,291 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { useState, useEffect, useRef } from 'react';
+import { socket, getAuthToken, API_BASE } from '../lib/socket';
+import LeftSidebar from './LeftSidebar';
+import ComicModal from './ComicModal';
+import EditorPanel from './EditorPanel';
+import SpideySenseModal from './SpideySenseModal';
+import SubmissionHistoryPanel from './SubmissionHistoryPanel';
+const CXX_TEMPLATE = `#include <iostream>
+using namespace std;
+
+int main() {
+    // Write your C++ code here
+    return 0;
+}
+`;
+const PY_TEMPLATE = `def main():
+    # Write your Python 3 code here
+    pass
+
+if __name__ == '__main__':
+    main()
+`;
+const JAVA_TEMPLATE = `import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        // Write your Java 21 code here
+        scanner.close();
+    }
+}
+`;
+export default function RightPanel({ selectedLang, setSelectedLang, setIsSaved, powerupCounts, onUsePowerup, onUseSpideySenseSuccess, currentProblem, teamId, teamName: _teamName, // kept in props interface for LeftSidebar display; not used directly here
+solvedCount, currentRank, latestVerdict, hintStage, totalProblems }) {
+    const [codes, setCodes] = useState({
+        cpp: CXX_TEMPLATE,
+        python: PY_TEMPLATE,
+        java: JAVA_TEMPLATE,
+    });
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSpideyModalOpen, setIsSpideyModalOpen] = useState(false);
+    const [modalStatus, setModalStatus] = useState('IDLE');
+    const [consoleLogs, setConsoleLogs] = useState([
+        "⚙ Terminal active. Waiting for code compilation..."
+    ]);
+    const [submissionResult, setSubmissionResult] = useState({
+        status: 'IDLE',
+        passedCount: 0,
+        totalCount: 0,
+    });
+    const [submissionProgress, setSubmissionProgress] = useState({
+        stage: 'IDLE',
+        currentTest: 0,
+        totalTests: 0,
+    });
+    const [submissionHistory, setSubmissionHistory] = useState([]);
+    const saveTimeoutRef = useRef(null);
+    const fetchSubmissionHistory = async () => {
+        if (!currentProblem)
+            return;
+        try {
+            const token = getAuthToken();
+            const res = await fetch(`${API_BASE}/api/workspace/${currentProblem.id}/submissions`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setSubmissionHistory(data);
+            }
+        }
+        catch (err) {
+            console.error('Failed to fetch submission history:', err);
+        }
+    };
+    // 1. Load workspace state from backend on problem switch
+    useEffect(() => {
+        if (!currentProblem)
+            return;
+        const loadWorkspace = async () => {
+            try {
+                const token = getAuthToken();
+                const res = await fetch(`${API_BASE}/api/workspace/${currentProblem.id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.found && data.workspace) {
+                        const savedLang = data.workspace.language.toLowerCase();
+                        setSelectedLang(savedLang);
+                        setCodes(prev => ({
+                            ...prev,
+                            [savedLang]: data.workspace.sourceCode,
+                        }));
+                        setIsSaved(true);
+                        return;
+                    }
+                }
+            }
+            catch (err) {
+                console.error('Failed to fetch workspace from backend:', err);
+            }
+            // Fallback to default starters if no workspace was found
+            if (currentProblem.starters) {
+                setCodes({
+                    cpp: currentProblem.starters.cpp || CXX_TEMPLATE,
+                    python: currentProblem.starters.python || PY_TEMPLATE,
+                    java: currentProblem.starters.java || JAVA_TEMPLATE,
+                });
+                setIsSaved(true);
+            }
+        };
+        loadWorkspace();
+        fetchSubmissionHistory();
+    }, [currentProblem?.id, teamId]); // M3: use teamId not teamName
+    // 2. Handle editor changes and trigger autosave
+    const handleEditorChange = (value) => {
+        const mappedLang = selectedLang === 'python' ? 'python' : selectedLang === 'java' ? 'java' : 'cpp';
+        setCodes(prev => ({
+            ...prev,
+            [mappedLang]: value,
+        }));
+        setIsSaved(false);
+        // Debounce save request
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+        saveTimeoutRef.current = setTimeout(() => {
+            triggerAutosave(value, selectedLang);
+        }, 1000);
+    };
+    const triggerAutosave = async (codeToSave, langToSave) => {
+        if (!currentProblem)
+            return;
+        try {
+            const token = getAuthToken();
+            const res = await fetch(`${API_BASE}/api/workspace/save`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    problemId: currentProblem.id,
+                    language: langToSave.toUpperCase(),
+                    sourceCode: codeToSave,
+                    cursorLine: 1,
+                    cursorColumn: 1,
+                    scrollPosition: 0,
+                    clientTimestamp: Date.now(),
+                }),
+            });
+            if (res.ok) {
+                setIsSaved(true);
+            }
+        }
+        catch (err) {
+            console.error('Autosave failed:', err);
+        }
+    };
+    useEffect(() => {
+        const onRunResult = (result) => {
+            setSubmissionProgress({ stage: 'DONE', currentTest: 0, totalTests: 0 });
+            if (result.verdict === 'CE') {
+                setConsoleLogs([
+                    "⚙ Compiling code...",
+                    "✗ Compilation Error:",
+                    result.stderr,
+                ]);
+                setSubmissionResult({
+                    status: 'COMPILE_ERROR',
+                    message: result.stderr,
+                    passedCount: 0,
+                    totalCount: 1,
+                });
+                setModalStatus('COMPILE_ERROR');
+            }
+            else {
+                setConsoleLogs([
+                    "⚙ Compiling code...",
+                    "⚙ Running test case...",
+                    result.verdict === 'AC' ? "✓ Test Case Passed!" : `✗ Test Case FAILED (${result.verdict})`,
+                    result.stdout ? `Stdout:\n${result.stdout}` : '',
+                    result.stderr ? `Stderr:\n${result.stderr}` : '',
+                ].filter(Boolean));
+                setSubmissionResult({
+                    status: result.verdict === 'AC' ? 'ACCEPTED' : 'FAILED',
+                    runtimeMs: result.runtimeMs,
+                    message: result.verdict === 'AC' ? undefined : `Verdict: ${result.verdict}`,
+                    passedCount: result.verdict === 'AC' ? 1 : 0,
+                    totalCount: 1,
+                });
+                setModalStatus(result.verdict === 'AC' ? 'ACCEPTED' : 'FAILED');
+            }
+            setIsModalOpen(true);
+        };
+        const onSubmitResult = (result) => {
+            setSubmissionProgress({ stage: 'DONE', currentTest: 0, totalTests: 0 });
+            const verdict = result.verdict;
+            const results = result.testCaseResults || [];
+            const passed = results.filter((r) => r.verdict === 'AC').length;
+            setConsoleLogs([
+                "⚙ Compiling code...",
+                `⚙ Running ${results.length} test cases...`,
+                ...results.map((r, idx) => r.verdict === 'AC'
+                    ? `✓ Test Case ${idx + 1} Passed (${r.runtimeMs}ms)`
+                    : `✗ Test Case ${idx + 1} FAILED (${r.verdict})`),
+                verdict === 'AC' ? "✓ ACCEPTED: Synchronized successfully!" : `✗ FAILED: ${verdict}`,
+            ]);
+            setSubmissionResult({
+                status: verdict === 'AC' ? 'ACCEPTED' : 'FAILED',
+                passedCount: passed,
+                totalCount: results.length,
+                runtimeMs: result.runtimeMs,
+            });
+            setModalStatus(verdict === 'AC' ? 'ACCEPTED' : 'FAILED');
+            setIsModalOpen(true);
+            fetchSubmissionHistory();
+        };
+        const onSubmitProgress = (progress) => {
+            setSubmissionProgress({
+                stage: progress.stage === 'COMPILING' ? 'COMPILING' : 'RUNNING',
+                currentTest: progress.currentTest,
+                totalTests: progress.totalTests,
+            });
+            if (progress.stage === 'COMPILING') {
+                setConsoleLogs(prev => [
+                    ...prev,
+                    "⚙ Compiling code...",
+                ]);
+            }
+            else if (progress.stage === 'RUNNING') {
+                setConsoleLogs(prev => [
+                    ...prev,
+                    `⚙ Running Test ${progress.currentTest} / ${progress.totalTests}...`,
+                ]);
+            }
+        };
+        socket.on('run:result', onRunResult);
+        socket.on('submit:result', onSubmitResult);
+        socket.on('submit:progress', onSubmitProgress);
+        return () => {
+            socket.off('run:result', onRunResult);
+            socket.off('submit:result', onSubmitResult);
+            socket.off('submit:progress', onSubmitProgress);
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
+    }, []);
+    const mappedLang = selectedLang === 'python' ? 'python' : selectedLang === 'java' ? 'java' : 'cpp';
+    const currentCode = codes[mappedLang] || '';
+    // 3. Save workspace immediately on language change
+    const handleLanguageChange = (lang) => {
+        setSelectedLang(lang);
+        const targetLang = lang === 'python' ? 'python' : lang === 'java' ? 'java' : 'cpp';
+        triggerAutosave(codes[targetLang] || '', lang);
+    };
+    const handleRunCode = () => {
+        if (!currentProblem)
+            return;
+        setConsoleLogs(["⚙ Dispatching code run request...", "⚙ Terminal active. Waiting for code compilation..."]);
+        const sampleInput = currentProblem.testCases?.find((tc) => !tc.hidden)?.input || '';
+        socket.emit('run:code', {
+            problemId: currentProblem.id,
+            code: currentCode,
+            language: selectedLang,
+            stdin: sampleInput,
+        });
+    };
+    const handleSubmitCode = () => {
+        if (!currentProblem)
+            return;
+        setConsoleLogs(["⚙ Dispatching submission request...", "⚙ Terminal active. Waiting for code compilation..."]);
+        socket.emit('submit:code', {
+            problemId: currentProblem.id,
+            code: currentCode,
+            language: selectedLang,
+        });
+    };
+    const activeChallenge = {
+        id: currentProblem?.id || "connections",
+        title: currentProblem?.title || "Web of Connections",
+        description: currentProblem?.statement || "The network of the Spider-Verse is connections."
+    };
+    return (_jsxs("div", { className: "flex flex-col gap-4 w-[820px] h-fit", children: [_jsx(EditorPanel, { activeChallenge: activeChallenge, language: mappedLang, setLanguage: handleLanguageChange, code: currentCode, onChangeCode: handleEditorChange, onRunCode: handleRunCode, onSubmitCode: handleSubmitCode, onUseSpideySense: () => setIsSpideyModalOpen(true), submissionResult: submissionResult, consoleLogs: consoleLogs, submissionProgress: submissionProgress }), _jsx(LeftSidebar, { onSpiderSenseClick: () => setIsSpideyModalOpen(true), powerupCounts: powerupCounts, onUsePowerup: onUsePowerup, solvedCount: solvedCount, totalProblems: totalProblems, currentRank: currentRank, hintStage: hintStage, latestVerdict: latestVerdict }), _jsx(SubmissionHistoryPanel, { submissions: submissionHistory }), _jsx(ComicModal, { isOpen: isModalOpen, onClose: () => setIsModalOpen(false), status: modalStatus, passedCount: submissionResult.passedCount || 0, totalCount: submissionResult.totalCount || 0, runtimeMs: submissionResult.runtimeMs || 0, memoryMb: submissionResult.memoryMb || 0, message: submissionResult.message }), _jsx(SpideySenseModal, { isOpen: isSpideyModalOpen, onClose: () => setIsSpideyModalOpen(false), onUse: () => {
+                    onUsePowerup('SPIDER_SENSE', currentProblem?.id);
+                    onUseSpideySenseSuccess?.();
+                } })] }));
+}
+//# sourceMappingURL=RightPanel.js.map

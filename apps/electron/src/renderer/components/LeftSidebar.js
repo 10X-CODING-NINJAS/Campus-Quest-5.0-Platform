@@ -1,0 +1,34 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { Zap, Shield } from 'lucide-react';
+function WebIcon({ className = '' }) {
+    return (_jsxs("svg", { viewBox: "0 0 24 24", className: className, fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: [_jsx("circle", { cx: "12", cy: "12", r: "10" }), _jsx("path", { d: "M12 2 L12 22 M2 12 L22 12 M5 5 L19 19 M19 5 L5 19", strokeLinecap: "round" })] }));
+}
+export default function LeftSidebar({ onSpiderSenseClick, powerupCounts, onUsePowerup, solvedCount = 0, totalProblems = 10, currentRank = 1, hintStage = 0, latestVerdict = 'none' }) {
+    const spideySenseRemaining = 3 - (powerupCounts?.SPIDER_SENSE || 0);
+    const webFluidRemaining = 2 - (powerupCounts?.WEB_FLUID || 0);
+    const suitTechRemaining = 2 - (powerupCounts?.SUIT_TECH || 0);
+    const progressPercent = totalProblems > 0 ? (solvedCount / totalProblems) * 100 : 0;
+    const getHintStageLabel = () => {
+        if (hintStage === 1)
+            return 'STAGE 1 (Active)';
+        if (hintStage === 2)
+            return 'STAGE 2 (Resonance)';
+        if (hintStage >= 3)
+            return 'MISSION COMPLETE ✓';
+        return 'LOCKED (Solve 3)';
+    };
+    return (_jsxs("aside", { className: "w-full bg-[#fdf6e2] comic-panel flex flex-col select-none p-5 text-black h-fit", children: [_jsxs("div", { className: "flex items-center justify-between mb-4 border-b-2 border-black/10 pb-2", children: [_jsx("div", { className: "comic-badge-yellow text-sm font-bold tracking-widest uppercase rounded-none", children: "MISSION CONTROL HUD" }), _jsxs("div", { className: "flex items-center gap-1.5 font-mono text-xs font-black", children: ["RANK: ", _jsxs("span", { className: "bg-yellow-400 text-black border-2 border-black px-2 py-0.5 rounded shadow-[1px_1px_0_#000]", children: ["#", currentRank] })] })] }), _jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-6", children: [_jsxs("div", { className: "space-y-4", children: [_jsxs("div", { children: [_jsxs("div", { className: "flex justify-between items-center text-black font-display font-bold text-xs uppercase tracking-wider mb-1", children: [_jsx("span", { children: "FRAGMENT PROGRESS" }), _jsxs("span", { className: "font-mono text-xs text-red-600 font-extrabold", children: [solvedCount, "/", totalProblems, " Solved"] })] }), _jsx("div", { className: "w-full h-6 border-3 border-black bg-stone-700 rounded-none shadow-[2px_2px_0px_#000] overflow-hidden p-0.5", children: _jsx("div", { className: "h-full bg-[#ef4444] border-r-2 border-black rounded-none transition-all duration-500", style: { width: `${progressPercent}%` } }) })] }), _jsxs("div", { className: "grid grid-cols-2 gap-3.5", children: [_jsxs("div", { className: "bg-white/60 border-2 border-black p-2 shadow-[2px_2px_0_#000]", children: [_jsx("div", { className: "text-[10px] text-zinc-500 font-display font-bold uppercase", children: "HINT SENSOR" }), _jsx("div", { className: "font-mono text-[10px] font-black text-purple-700 uppercase mt-0.5", children: getHintStageLabel() })] }), _jsxs("div", { className: "bg-white/60 border-2 border-black p-2 shadow-[2px_2px_0_#000]", children: [_jsx("div", { className: "text-[10px] text-zinc-500 font-display font-bold uppercase", children: "LAST VERDICT" }), _jsx("div", { className: `font-mono text-[10px] font-black uppercase mt-0.5 ${latestVerdict === 'AC' ? 'text-green-600 animate-pulse' :
+                                                    latestVerdict === 'none' ? 'text-zinc-500' : 'text-red-500'}`, children: latestVerdict })] })] })] }), _jsxs("div", { className: "flex flex-col justify-center", children: [_jsx("div", { className: "text-[10px] text-zinc-500 font-display font-bold uppercase mb-2", children: "POWERUP ARSENAL" }), _jsxs("div", { className: "grid grid-cols-3 gap-3", children: [_jsxs("div", { onClick: () => {
+                                            if (spideySenseRemaining > 0) {
+                                                if (onSpiderSenseClick)
+                                                    onSpiderSenseClick();
+                                            }
+                                        }, className: `flex flex-col items-center justify-center bg-white/70 border-3 border-black p-2 rounded-none shadow-[3px_3px_0px_#000] transition-transform text-center ${spideySenseRemaining > 0 ? 'hover:translate-y-[-1px] cursor-pointer' : 'opacity-50 cursor-not-allowed'}`, children: [_jsx("div", { className: "w-9 h-9 rounded-none bg-[#ef4444] border-2 border-black flex items-center justify-center shadow-[1px_1px_0px_#000] text-white mb-1.5", children: _jsx(WebIcon, { className: "w-4.5 h-4.5" }) }), _jsx("div", { className: "text-black font-display font-bold text-[11px] leading-none", children: "SPIDER SENSE" }), _jsxs("div", { className: "text-[9px] text-gray-500 font-semibold mt-1", children: ["Remaining: ", spideySenseRemaining] })] }), _jsxs("div", { onClick: () => {
+                                            if (webFluidRemaining > 0)
+                                                onUsePowerup?.('WEB_FLUID');
+                                        }, className: `flex flex-col items-center justify-center bg-white/70 border-3 border-black p-2 rounded-none shadow-[3px_3px_0px_#000] transition-transform text-center ${webFluidRemaining > 0 ? 'hover:translate-y-[-1px] cursor-pointer' : 'opacity-50 cursor-not-allowed'}`, children: [_jsx("div", { className: "w-9 h-9 rounded-none bg-[#3b82f6] border-2 border-black flex items-center justify-center shadow-[1px_1px_0px_#000] text-white mb-1.5", children: _jsx(Zap, { className: "w-4 h-4 fill-current" }) }), _jsx("div", { className: "text-black font-display font-bold text-[11px] leading-none", children: "WEB-FLUID" }), _jsxs("div", { className: "text-[9px] text-gray-500 font-semibold mt-1", children: ["Remaining: ", webFluidRemaining] })] }), _jsxs("div", { onClick: () => {
+                                            if (suitTechRemaining > 0)
+                                                onUsePowerup?.('SUIT_TECH');
+                                        }, className: `flex flex-col items-center justify-center bg-white/70 border-3 border-black p-2 rounded-none shadow-[3px_3px_0px_#000] transition-transform text-center ${suitTechRemaining > 0 ? 'hover:translate-y-[-1px] cursor-pointer' : 'opacity-50 cursor-not-allowed'}`, children: [_jsx("div", { className: "w-9 h-9 rounded-none bg-[#3b82f6] border-2 border-black flex items-center justify-center shadow-[1px_1px_0px_#000] text-white mb-1.5", children: _jsx(Shield, { className: "w-4.5 h-4.5 fill-current" }) }), _jsx("div", { className: "text-black font-display font-bold text-[11px] leading-none", children: "SUIT TECH" }), _jsxs("div", { className: "text-[9px] text-gray-500 font-semibold mt-1", children: ["Remaining: ", suitTechRemaining] })] })] })] })] })] }));
+}
+//# sourceMappingURL=LeftSidebar.js.map
