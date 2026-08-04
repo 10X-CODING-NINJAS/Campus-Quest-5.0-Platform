@@ -14,10 +14,21 @@ export const JWT_SECRET = process.env.JWT_SECRET || 'campus_quest_jwt_secret_key
 // These are inserted into the DB on backend start via seedTestTeams().
 // Password is stored in plain text here ONLY for demo/dev purposes.
 export const TEST_TEAMS = [
-  { id: 'test-team-alpha',   name: 'Spider Squad',     email: 'spider@test.cq',   password: 'spider123' },
-  { id: 'test-team-beta',    name: 'Iron Coders',      email: 'iron@test.cq',     password: 'iron456' },
-  { id: 'test-team-gamma',   name: 'Web Slingers',     email: 'web@test.cq',      password: 'web789' },
-  { id: 'test-team-delta',   name: 'Quantum Devs',     email: 'quantum@test.cq',  password: 'quantum000' },
+  { id: 'test-team-alpha',     name: 'Spider Squad',       email: 'spider@test.cq',     password: 'spider123' },
+  { id: 'test-team-beta',      name: 'Iron Coders',        email: 'iron@test.cq',       password: 'iron456' },
+  { id: 'test-team-gamma',     name: 'Web Slingers',       email: 'web@test.cq',        password: 'web789' },
+  { id: 'test-team-delta',     name: 'Quantum Devs',       email: 'quantum@test.cq',    password: 'quantum000' },
+  { id: 'test-team-epsilon',   name: 'Cyber Spiders',      email: 'cyber@test.cq',      password: 'cyber101' },
+  { id: 'test-team-zeta',      name: 'Venom Bytes',        email: 'venom@test.cq',      password: 'venom2024' },
+  { id: 'test-team-eta',       name: 'Glitch Hackers',     email: 'glitch@test.cq',     password: 'glitch505' },
+  { id: 'test-team-theta',     name: 'Prowler Protocol',   email: 'prowler@test.cq',    password: 'prowler77' },
+  { id: 'test-team-iota',      name: 'Multiverse Ninjas',  email: 'multiverse@test.cq', password: 'multiverse99' },
+  { id: 'test-team-kappa',     name: 'Oscorp Engineers',   email: 'oscorp@test.cq',     password: 'oscorp321' },
+  { id: 'test-team-lambda',    name: 'Symbiote Script',    email: 'symbiote@test.cq',   password: 'symbiote11' },
+  { id: 'test-team-mu',        name: 'Daily Bugle Devs',   email: 'bugle@test.cq',      password: 'bugle2026' },
+  { id: 'test-team-nu',        name: 'Sinister Coders',    email: 'sinister@test.cq',   password: 'sinister6' },
+  { id: 'test-team-xi',        name: 'Stark Industries',   email: 'stark@test.cq',      password: 'stark3000' },
+  { id: 'test-team-omicron',   name: 'Web Warriors',       email: 'warriors@test.cq',   password: 'warriors88' },
 ];
 
 // Seed test teams into DB on startup (idempotent)
