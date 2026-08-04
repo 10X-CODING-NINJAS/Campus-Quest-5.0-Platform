@@ -165,6 +165,7 @@ export default function App() {
 
     let unsubscribeSecurity: (() => void) | undefined;
     if ((window as any).electronAPI?.onSecurityViolation) {
+      // ── Electron path: IPC-based violation events ──────────────────────────
       unsubscribeSecurity = (window as any).electronAPI.onSecurityViolation((type: string) => {
         setViolationCount((prev) => {
           const newCount = prev + 1;
@@ -184,6 +185,46 @@ export default function App() {
           return newCount;
         });
       });
+    } else {
+      // ── Browser path: DOM event-based violation detection ─────────────────
+      // Fires the exact same violation logic as the Electron IPC path above.
+      const triggerBrowserViolation = (type: 'blur' | 'leave-full-screen') => {
+        setViolationCount((prev) => {
+          const newCount = prev + 1;
+          if (newCount >= 5) {
+            setIsAutoSubmitted(true);
+            setSecurityWarning(null);
+          } else {
+            socket.emit('violation:trigger', { type });
+            setIsTeamPaused(true);
+            setSecurityWarning(
+              type === 'blur'
+                ? `You switched away from the assessment window! (Violation ${newCount}/5)`
+                : `You attempted to exit full screen mode! (Violation ${newCount}/5)`
+            );
+          }
+          return newCount;
+        });
+      };
+
+      // Tab switch / window blur detection
+      const handleVisibilityChange = () => {
+        if (document.hidden) triggerBrowserViolation('blur');
+      };
+
+      // Fullscreen exit detection (user pressed Esc or F11)
+      const handleFullscreenChange = () => {
+        if (!document.fullscreenElement) triggerBrowserViolation('leave-full-screen');
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+      // Store cleanup in unsubscribeSecurity so the return block handles it uniformly
+      unsubscribeSecurity = () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      };
     }
 
     return () => {
@@ -228,6 +269,17 @@ export default function App() {
       socket.off('connect_error', handleConnectError);
     };
   }, [reconnectState]);
+
+  // Browser fallback: auto-request fullscreen when entering the coding screen.
+  // In Electron production, kiosk mode handles this. In a browser, we prompt once.
+  useEffect(() => {
+    if (currentScreen !== 'coding') return;
+    if ((window as any).electronAPI) return; // Electron handles kiosk mode natively
+    if (document.fullscreenElement) return; // Already fullscreen
+    document.documentElement.requestFullscreen().catch(() => {
+      // User may have blocked fullscreen — non-fatal, violations will still fire
+    });
+  }, [currentScreen]);
 
   // HIGH-5: No optimistic update — powerup:updated event from server is authoritative
   const handleUsePowerup = (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH', problemId?: string) => {
