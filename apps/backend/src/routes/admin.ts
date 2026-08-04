@@ -29,6 +29,16 @@ export const TEST_TEAMS = [
   { id: 'test-team-nu',        name: 'Sinister Coders',    email: 'sinister@test.cq',   password: 'sinister6' },
   { id: 'test-team-xi',        name: 'Stark Industries',   email: 'stark@test.cq',      password: 'stark3000' },
   { id: 'test-team-omicron',   name: 'Web Warriors',       email: 'warriors@test.cq',   password: 'warriors88' },
+  { id: 'test-team-pi',        name: 'Electro Algorithms', email: 'electro@test.cq',    password: 'electro100' },
+  { id: 'test-team-rho',       name: 'Goblin Innovators',  email: 'goblin@test.cq',     password: 'goblin200' },
+  { id: 'test-team-sigma',     name: 'Rhino Compilers',    email: 'rhino@test.cq',      password: 'rhino300' },
+  { id: 'test-team-tau',       name: 'Mysterio Coders',    email: 'mysterio@test.cq',   password: 'mysterio400' },
+  { id: 'test-team-upsilon',   name: 'Kraven Hackers',     email: 'kraven@test.cq',     password: 'kraven500' },
+  { id: 'test-team-phi',       name: 'Lizard Logic',       email: 'lizard@test.cq',     password: 'lizard600' },
+  { id: 'test-team-chi',       name: 'Sandman Script',     email: 'sandman@test.cq',    password: 'sandman700' },
+  { id: 'test-team-psi',       name: 'Vulture Vector',     email: 'vulture@test.cq',    password: 'vulture800' },
+  { id: 'test-team-omega',     name: 'Carnage Bytes',      email: 'carnage@test.cq',    password: 'carnage900' },
+  { id: 'test-team-25',        name: 'Kingpin Coders',     email: 'kingpin@test.cq',    password: 'kingpin999' },
 ];
 
 // Seed test teams into DB on startup (idempotent)
