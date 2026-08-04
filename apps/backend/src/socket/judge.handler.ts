@@ -143,6 +143,7 @@ export function registerJudgeHandlers(socket: any) {
         status: 'DONE', 
         verdict: submission.verdict,
         testCases: results,
+        testCaseResults: results, // alias — frontend reads this field
         problemId
       });
 

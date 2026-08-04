@@ -270,17 +270,6 @@ export default function App() {
     };
   }, [reconnectState]);
 
-  // Browser fallback: auto-request fullscreen when entering the coding screen.
-  // In Electron production, kiosk mode handles this. In a browser, we prompt once.
-  useEffect(() => {
-    if (currentScreen !== 'coding') return;
-    if ((window as any).electronAPI) return; // Electron handles kiosk mode natively
-    if (document.fullscreenElement) return; // Already fullscreen
-    document.documentElement.requestFullscreen().catch(() => {
-      // User may have blocked fullscreen — non-fatal, violations will still fire
-    });
-  }, [currentScreen]);
-
   // HIGH-5: No optimistic update — powerup:updated event from server is authoritative
   const handleUsePowerup = (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH', problemId?: string) => {
     socket.emit('powerup:use', { type, problemId });
