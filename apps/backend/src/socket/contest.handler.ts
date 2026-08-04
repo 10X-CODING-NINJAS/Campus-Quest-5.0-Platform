@@ -2,9 +2,8 @@ import { db } from '../db';
 import { teams, contests, teamPowerups, submissions } from '../db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { calculateLeaderboard } from '../utils/leaderboard';
-import { reportViolation } from '../services/violations';
 
-export function registerContestHandlers(socket: any, io: any) {
+export function registerContestHandlers(socket: any, _io: any) {
   
   // When a user connects, they can request their initial state
   socket.on('contest:sync', async () => {
