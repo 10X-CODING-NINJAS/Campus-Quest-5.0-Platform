@@ -82,7 +82,7 @@ export default function App() {
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
 
   const [adminToken, setAdminToken] = useState<string | null>(
-    () => sessionStorage.getItem('cq_admin_token') || 'spidey_admin_2024'
+    () => sessionStorage.getItem('cq_admin_token') || null
   );
   const [loginInput, setLoginInput] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -142,6 +142,7 @@ export default function App() {
     socket.on('connect', () => {
       console.log('[Admin Socket] Connected to stream');
       socket.emit('join:admin');
+      fetchData(); // pull fresh data on connection / reconnection
     });
 
     socket.on('admin:violation_alert', (alert: any) => {
@@ -163,7 +164,10 @@ export default function App() {
     socket.on('submit:result', () => { fetchData(); });
     socket.on('demo:leaderboard_updated', () => { fetchData(); });
     socket.on('demo:contest_reset', () => { fetchData(); setContestStatus('NOT_STARTED'); });
+    // WARN-1 fix: handle lobby state — admin sees LOBBY before RUNNING
+    socket.on('contest:lobby_started', () => setContestStatus('LOBBY'));
     socket.on('contest:started', () => setContestStatus('RUNNING'));
+    socket.on('contest:resumed', () => setContestStatus('RUNNING'));
     socket.on('contest:paused', () => setContestStatus('PAUSED'));
     socket.on('contest:ended', () => setContestStatus('ENDED'));
 
@@ -180,10 +184,9 @@ export default function App() {
     setLoginLoading(true);
     setLoginError(null);
     try {
-      // H5: Validate secret against the backend — reject before setting token
-      await axios.get(`${API_URL}/contest-status`, {
-        headers: { Authorization: `Bearer ${secret}` }
-      });
+      // POST to /admin/login — backend validates the secret and returns 401 if wrong.
+      // This is the canonical auth flow; the secret itself is used as the bearer token.
+      await axios.post(`${API_URL}/login`, { secret });
       setAdminToken(secret);
     } catch (err: any) {
       if (err.response?.status === 401) {
@@ -229,7 +232,8 @@ export default function App() {
       else if (action === 'stop') endpoint = '/emergency-stop';
       else if (action === 'reset') endpoint = '/reset-contest';
       await axios.post(`${API_URL}${endpoint}`);
-      setContestStatus(action === 'stop' ? 'ENDED' : action === 'reset' ? 'NOT_STARTED' : action === 'start' || action === 'resume' ? 'RUNNING' : 'PAUSED');
+      // WARN-1 fix: Start transitions to LOBBY (not immediately RUNNING)
+      setContestStatus(action === 'stop' ? 'ENDED' : action === 'reset' ? 'NOT_STARTED' : action === 'start' ? 'LOBBY' : action === 'resume' ? 'RUNNING' : 'PAUSED');
       fetchData();
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'An error occurred');

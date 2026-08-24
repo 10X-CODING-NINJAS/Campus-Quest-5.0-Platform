@@ -2,7 +2,7 @@ import { db } from '../db';
 import { problems, submissions, teams, contests } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { SupportedLanguage } from '../judge/languages';
-import { runInSandbox } from '../judge/runner';
+import { judgeQueue, judgeQueueEvents, DEFAULT_JOB_OPTIONS } from '../judge/queue';
 import { broadcastLeaderboard } from '../utils/leaderboard';
 
 // H1: Per-team submission cooldown (5 seconds) to prevent spam
@@ -11,24 +11,41 @@ const SUBMIT_COOLDOWN_MS = 5000;
 
 export function registerJudgeHandlers(socket: any) {
   socket.on('run:code', async ({ problemId, code, language, stdin }: { problemId?: string; code: string; language: SupportedLanguage; stdin: string }) => {
+    const handlerStart = Date.now();
     try {
-      console.log(`[Judge] Running code for problem: ${problemId}, language: ${language}`);
+      console.log(`[Judge] Enqueuing code run for problem: ${problemId}, language: ${language}`);
       
+      const dbStart = Date.now();
       let expectedOutput: string | undefined = undefined;
       if (problemId) {
         const [problem] = await db.select().from(problems).where(eq(problems.id, problemId));
         if (problem) {
           const testCases = (problem.testCases as any[]) || [];
-          // Match the input to find the expected output
           const matchedTc = testCases.find(tc => tc.input.trim() === stdin.trim());
           if (matchedTc) {
             expectedOutput = matchedTc.output;
           }
         }
       }
+      const databaseTime = Date.now() - dbStart;
 
-      const result = await runInSandbox(language, code, stdin, expectedOutput);
+      const queueStart = Date.now();
+      const job = await judgeQueue.add('run-job', {
+        type: 'run',
+        language,
+        code,
+        stdin,
+        expectedOutput
+      }, DEFAULT_JOB_OPTIONS);
+      const result = await job.waitUntilFinished(judgeQueueEvents);
+      const executionTime = Date.now() - queueStart;
+
+      const socketStart = Date.now();
       socket.emit('run:result', result);
+      const socketTime = Date.now() - socketStart;
+
+      const totalTime = Date.now() - handlerStart;
+      console.log(`[Run Timing Audit] Problem: ${problemId || 'N/A'}, Language: ${language}, databaseTime: ${databaseTime}ms, queueWaitAndExecutionTime: ${executionTime}ms, socketTime: ${socketTime}ms, totalTime: ${totalTime}ms`);
     } catch (err) {
       console.error('[Judge Error]:', err);
       socket.emit('run:result', { verdict: 'CE', stdout: '', stderr: 'Internal Server Error during execution', runtimeMs: 0 });
@@ -36,7 +53,13 @@ export function registerJudgeHandlers(socket: any) {
   });
 
   socket.on('submit:code', async ({ problemId, code, language }: { problemId: string; code: string; language: SupportedLanguage }) => {
+    const handlerStart = Date.now();
+    let databaseTime = 0;
+    let executionTime = 0;
+    let socketTime = 0;
+
     try {
+      const dbStart = Date.now();
       // HIGH-4: Validate contest is RUNNING before accepting any submission
       const [globalContest] = await db.select().from(contests);
       if (!globalContest || globalContest.status !== 'RUNNING') {
@@ -66,33 +89,49 @@ export function registerJudgeHandlers(socket: any) {
         socket.emit('submit:result', { status: 'REJECTED', message: 'Team not found.' });
         return;
       }
-      // NOTE: isPaused / isDisqualified checks removed for testing — no proctoring
 
-      console.log(`[Judge] Submitting code for problem: ${problemId}, language: ${language}`);
+      console.log(`[Judge] Enqueuing submission for problem: ${problemId}, language: ${language}`);
       const [problem] = await db.select().from(problems).where(eq(problems.id, problemId));
       if (!problem) {
         throw new Error('Problem not found');
       }
 
       const testCases: any[] = (problem.testCases as any[]) || [];
-      const results: any[] = [];
-      let overallVerdict: 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE' = 'AC';
-      let maxRuntime = 0;
+      databaseTime += Date.now() - dbStart;
 
       socket.emit('submit:progress', { stage: 'COMPILING', currentTest: 0, totalTests: testCases.length });
 
-      for (const [i, tc] of testCases.entries()) {
-        socket.emit('submit:progress', { stage: 'RUNNING', currentTest: i + 1, totalTests: testCases.length });
-        
-        const result = await runInSandbox(language, code, tc.input, tc.output);
-        results.push({ index: i, verdict: result.verdict, runtimeMs: result.runtimeMs, memoryKb: 0 });
-        maxRuntime = Math.max(maxRuntime, result.runtimeMs);
+      // Dispatch to BullMQ
+      const queueStart = Date.now();
+      const job = await judgeQueue.add('submit-job', {
+        type: 'submit',
+        language,
+        code,
+        testCases: testCases.map(tc => ({ input: tc.input, output: tc.output }))
+      }, DEFAULT_JOB_OPTIONS);
 
-        if (result.verdict !== 'AC') {
-          overallVerdict = result.verdict;
-          break; // stop at first failing test
+      const progressListener = (args: { jobId: string; data: any }) => {
+        if (args.jobId === job.id) {
+          const socketEmitStart = Date.now();
+          socket.emit('submit:progress', args.data);
+          socketTime += Date.now() - socketEmitStart;
         }
+      };
+
+      judgeQueueEvents.on('progress', progressListener);
+
+      let jobResult;
+      try {
+        jobResult = await job.waitUntilFinished(judgeQueueEvents);
+      } finally {
+        judgeQueueEvents.off('progress', progressListener);
       }
+      executionTime = Date.now() - queueStart;
+
+      const dbTxStart = Date.now();
+      const results = jobResult.results;
+      const overallVerdict = jobResult.overallVerdict;
+      const maxRuntime = jobResult.maxRuntime;
 
       const [submission] = await db.transaction(async (tx) => {
         const [sub] = await tx.insert(submissions).values({
@@ -110,6 +149,7 @@ export function registerJudgeHandlers(socket: any) {
         if (overallVerdict === 'AC') {
           const teamSubmissions = await tx.select({
             problemId: submissions.problemId,
+            verdict: submissions.verdict,
           })
           .from(submissions)
           .where(and(
@@ -117,10 +157,11 @@ export function registerJudgeHandlers(socket: any) {
             eq(submissions.verdict, 'AC')
           ));
 
-          const distinctSolved = new Set(teamSubmissions.map(s => s.problemId)).size;
+          const solvedIds = Array.from(new Set(teamSubmissions.map(s => s.problemId)));
+          const distinctSolved = solvedIds.length;
           
           let newHintStage = 0;
-          if (distinctSolved >= 10) newHintStage = 3;
+          if (distinctSolved >= 9) newHintStage = 3;
           else if (distinctSolved >= 6) newHintStage = 2;
           else if (distinctSolved >= 3) newHintStage = 1;
 
@@ -128,14 +169,29 @@ export function registerJudgeHandlers(socket: any) {
           if (newHintStage > currentStage) {
             await tx.update(teams).set({ hintStage: newHintStage }).where(eq(teams.id, teamId));
           }
-          // Always emit progress update so client can update solved count display
-          socket.to(`team:${teamId}`).emit('team:progress_updated', { hintStage: newHintStage, solvedCount: distinctSolved });
-          socket.emit('team:progress_updated', { hintStage: newHintStage, solvedCount: distinctSolved });
+          
+          const socketEmitStart = Date.now();
+          // WARN-5 fix: include solvedProblemIds so client can update local set without waiting for sync
+          socket.to(`team:${teamId}`).emit('team:progress_updated', {
+            hintStage: newHintStage,
+            solvedCount: distinctSolved,
+            solvedProblemIds: solvedIds,
+            bypassedProblemIds: [],
+          });
+          socket.emit('team:progress_updated', {
+            hintStage: newHintStage,
+            solvedCount: distinctSolved,
+            solvedProblemIds: solvedIds,
+            bypassedProblemIds: [],
+          });
+          socketTime += Date.now() - socketEmitStart;
         }
         
         return [sub];
       });
+      databaseTime += Date.now() - dbTxStart;
 
+      const finalSocketStart = Date.now();
       socket.emit('submit:result', { 
         status: 'DONE', 
         verdict: submission.verdict,
@@ -149,6 +205,10 @@ export function registerJudgeHandlers(socket: any) {
         const io = (socket as any).server || socket.conn?.server;
         await broadcastLeaderboard(io, db);
       }
+      socketTime += Date.now() - finalSocketStart;
+
+      const totalTime = Date.now() - handlerStart;
+      console.log(`[Submission Timing Audit] Team: ${teamId}, Problem: ${problemId}, Language: ${language}, databaseTime: ${databaseTime}ms, queueWaitAndExecutionTime: ${executionTime}ms, socketTime: ${socketTime}ms, totalTime: ${totalTime}ms`);
     } catch (err) {
       console.error('[Judge Error]:', err);
       socket.emit('submit:result', { status: 'FAILED', message: 'Internal Server Error during execution' });

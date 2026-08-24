@@ -1,5 +1,5 @@
 import {
-  pgTable, pgEnum, text, integer, boolean, timestamp, json, bigint
+  pgTable, pgEnum, text, integer, boolean, timestamp, json, bigint, index
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { createId } from '@paralleldrive/cuid2';
@@ -8,7 +8,7 @@ import { createId } from '@paralleldrive/cuid2';
 export const languageEnum = pgEnum('language', ['C', 'CPP', 'PYTHON', 'JAVA']);
 export const submissionStatusEnum = pgEnum('submission_status', ['PENDING', 'JUDGING', 'DONE']);
 export const verdictEnum = pgEnum('verdict', ['AC', 'WA', 'TLE', 'MLE', 'RE', 'CE', 'BYPASSED']);
-export const contestStatusEnum = pgEnum('contest_status', ['NOT_STARTED', 'RUNNING', 'PAUSED', 'ENDED']);
+export const contestStatusEnum = pgEnum('contest_status', ['NOT_STARTED', 'LOBBY', 'RUNNING', 'PAUSED', 'ENDED']);
 export const violationTypeEnum = pgEnum('violation_type', [
   'TAB_SWITCH', 'BLUR', 'FULLSCREEN_EXIT', 'DEVTOOLS_ATTEMPT', 'COPY_PASTE',
 ]);
@@ -41,6 +41,8 @@ export const contests = pgTable('contests', {
   totalPausedMs: integer('total_paused_ms').notNull().default(0),
   durationMs: integer('duration_ms').notNull(),
   endsAt: timestamp('ends_at'),
+  lobbyStartedAt: timestamp('lobby_started_at'),
+  lobbyDurationMs: integer('lobby_duration_ms').default(900000), // default to 15 minutes
 });
 
 // ---------- Problem ----------
@@ -52,7 +54,9 @@ export const problems = pgTable('problems', {
   timeLimitMs: integer('time_limit_ms').notNull().default(2000),
   memoryLimitMb: integer('memory_limit_mb').notNull().default(256),
   testCases: json('test_cases').$type<{ input: string; output: string; hidden: boolean }[]>().notNull(),
-});
+}, (table) => [
+  index('problems_order_idx').on(table.order),
+]);
 
 // ---------- Submission ----------
 export const submissions = pgTable('submissions', {
@@ -70,7 +74,12 @@ export const submissions = pgTable('submissions', {
   }[]>(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   judgedAt: timestamp('judged_at'),
-});
+}, (table) => [
+  index('submissions_team_id_idx').on(table.teamId),
+  index('submissions_problem_id_idx').on(table.problemId),
+  index('submissions_verdict_idx').on(table.verdict),
+  index('submissions_created_at_idx').on(table.createdAt),
+]);
 
 // ---------- Violation ----------
 export const violations = pgTable('violations', {
@@ -78,7 +87,9 @@ export const violations = pgTable('violations', {
   teamId: text('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
   type: violationTypeEnum('type').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
-});
+}, (table) => [
+  index('violations_team_id_idx').on(table.teamId),
+]);
 
 // ---------- Powerup ----------
 export const teamPowerups = pgTable('team_powerups', {
@@ -87,7 +98,9 @@ export const teamPowerups = pgTable('team_powerups', {
   type: powerupTypeEnum('type').notNull(),
   usedAt: timestamp('used_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
-});
+}, (table) => [
+  index('team_powerups_team_id_idx').on(table.teamId),
+]);
 
 // ---------- Team Workspace (Autosave Persistence) ----------
 export const teamWorkspaces = pgTable('team_workspaces', {
@@ -102,7 +115,9 @@ export const teamWorkspaces = pgTable('team_workspaces', {
   lastClientUpdate: bigint('last_client_update', { mode: 'number' }).notNull().default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+}, (table) => [
+  index('team_workspaces_team_id_problem_id_idx').on(table.teamId, table.problemId),
+]);
 
 // ---------- Relations ----------
 export const teamsRelations = relations(teams, ({ many }) => ({

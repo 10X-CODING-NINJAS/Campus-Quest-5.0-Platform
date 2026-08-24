@@ -1,6 +1,6 @@
 import { Worker, Job } from 'bullmq';
-import { connection } from '../config/redis';
-import { runInSandbox } from '../judge/runner';
+import { makeRedisConnection } from '../judge/queue';
+import { runInSandbox, runBatchInSandbox } from '../judge/runner';
 import { JUDGE_QUEUE_NAME } from '../judge/queue';
 import { SupportedLanguage } from '../judge/languages';
 
@@ -9,6 +9,7 @@ interface RunJobData {
   language: SupportedLanguage;
   code: string;
   stdin: string;
+  expectedOutput?: string;
 }
 
 interface SubmitJobData {
@@ -27,33 +28,41 @@ export function startJudgeWorker() {
       const data = job.data;
 
       if (data.type === 'run') {
-        const result = await runInSandbox(data.language, data.code, data.stdin);
+        const result = await runInSandbox(data.language, data.code, data.stdin, data.expectedOutput);
         return result;
       }
 
       if (data.type === 'submit') {
         const testCases = data.testCases;
-        const results = [];
-        let overallVerdict: 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE' = 'AC';
-        let maxRuntime = 0;
 
-        for (const [i, tc] of testCases.entries()) {
-          const result = await runInSandbox(data.language, data.code, tc.input, tc.output);
-          results.push({ index: i, verdict: result.verdict, runtimeMs: result.runtimeMs, memoryKb: 0 });
-          maxRuntime = Math.max(maxRuntime, result.runtimeMs);
-
-          if (result.verdict !== 'AC') {
-            overallVerdict = result.verdict;
-            break; // stop at first failing test
+        const batchResult = await runBatchInSandbox(
+          data.language,
+          data.code,
+          testCases,
+          (stage, currentTest) => {
+            job.updateProgress({ stage, currentTest, totalTests: testCases.length }).catch(() => {});
           }
-        }
+        );
 
-        return { overallVerdict, maxRuntime, results };
+        const results = batchResult.results.map(r => ({
+          index: r.index,
+          verdict: r.verdict,
+          runtimeMs: r.runtimeMs,
+          memoryKb: 0
+        }));
+
+        const maxRuntime = results.reduce((max, r) => Math.max(max, r.runtimeMs), 0);
+
+        return {
+          overallVerdict: batchResult.overallVerdict,
+          maxRuntime,
+          results
+        };
       }
 
       throw new Error(`Unknown job type`);
     },
-    { connection: connection as any, concurrency: 4 } // Allow up to 4 concurrent Docker runs
+    { connection: makeRedisConnection() as any, concurrency: parseInt(process.env.JUDGE_CONCURRENCY || '4', 10) }
   );
 
   worker.on('ready', () => {

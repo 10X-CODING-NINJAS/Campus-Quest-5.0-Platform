@@ -4,9 +4,11 @@ import { eq } from 'drizzle-orm';
 import fs from 'fs/promises';
 import path from 'path';
 
-export async function syncProblemsToDatabase() {
+export async function syncProblemsToDatabase(): Promise<{ totalProblems: number; totalTestcases: number }> {
   const problemsDir = process.env.PROBLEMS_DIR || path.resolve(process.cwd(), '../../problems');
   console.log(`[Sync Problems] Scanning problems directory: ${problemsDir}`);
+  let totalProblems = 0;
+  let totalTestcases = 0;
   try {
     const items = await fs.readdir(problemsDir);
     for (const item of items) {
@@ -76,7 +78,9 @@ export async function syncProblemsToDatabase() {
             testCases,
           });
         }
-        console.log(`[Sync Problems] Successfully synced: ${config.id}`);
+        console.log(`[Sync Problems] Successfully synced: ${config.id} (${testCases.length} testcases)`);
+        totalProblems++;
+        totalTestcases += testCases.length;
       } catch (err: any) {
         console.warn(`[Sync Problems] Skipping ${item} due to error:`, err.message);
       }
@@ -101,4 +105,6 @@ export async function syncProblemsToDatabase() {
   } catch (err: any) {
     console.warn('[Sync Problems] Could not validate problem order:', err.message);
   }
+
+  return { totalProblems, totalTestcases };
 }

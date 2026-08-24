@@ -20,23 +20,24 @@ export async function runMigrations() {
   }
 
   try {
-    // Check if the schema is stale (missing columns from updated migration).
-    // If so, drop everything and re-apply from scratch.
-    // This is safe because we are in initial deployment — no user data yet.
-    try {
-      await db.execute(sql`SELECT "is_paused" FROM "teams" LIMIT 0`);
-    } catch {
-      console.log('[Database] Schema is stale or missing. Dropping all tables to re-apply migrations...');
-      await db.execute(sql`DROP SCHEMA IF EXISTS drizzle CASCADE`);
-      await db.execute(sql`DROP SCHEMA public CASCADE`);
-      await db.execute(sql`CREATE SCHEMA public`);
-      await db.execute(sql`GRANT ALL ON SCHEMA public TO PUBLIC`);
-      console.log('[Database] Schema reset complete.');
-    }
+    // ── Safe schema evolution ──────────────────────────────────────────────────
+    // Instead of DROP SCHEMA (which destroys all contest data), we add missing
+    // columns individually using IF NOT EXISTS. This is safe to run mid-contest.
+    //
+    // Add columns introduced in the lobby phase if they don't exist yet.
+    // This runs before the Drizzle migrator so the migrator sees a consistent schema.
+    await db.execute(sql`
+      ALTER TABLE contests
+        ADD COLUMN IF NOT EXISTS lobby_started_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS lobby_duration_ms INTEGER DEFAULT 900000
+    `);
 
+    // Run the Drizzle migration files (idempotent — already-applied migrations are skipped).
     await migrate(db, { migrationsFolder });
     console.log(`[Database] ✅ Migrations successfully applied from: ${migrationsFolder}`);
   } catch (err: any) {
     console.error('[Database] ❌ Migration error:', err.message);
+    // Do NOT exit — let the server start and serve what it can.
+    // A broken migration should not take down a running contest.
   }
 }

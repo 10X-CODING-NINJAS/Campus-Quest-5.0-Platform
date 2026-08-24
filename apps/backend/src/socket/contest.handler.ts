@@ -10,6 +10,20 @@ export function registerContestHandlers(socket: any, _io: any) {
     // Get global contest status
     const allContests = await db.select().from(contests);
     const globalContest = allContests[0]; // Assuming singleton contest for now
+    const now = new Date();
+
+    let contestStatus = globalContest?.status || 'NOT_STARTED';
+    let lobbyTimeLeftMs = 0;
+
+    if (globalContest && globalContest.status === 'LOBBY' && globalContest.startedAt) {
+      const startedAt = new Date(globalContest.startedAt);
+      if (now.getTime() >= startedAt.getTime()) {
+        contestStatus = 'RUNNING';
+        lobbyTimeLeftMs = 0;
+      } else {
+        lobbyTimeLeftMs = startedAt.getTime() - now.getTime();
+      }
+    }
     
     // Get team status
     const teamId = socket.data?.teamId;
@@ -64,7 +78,7 @@ export function registerContestHandlers(socket: any, _io: any) {
     }
     
     socket.emit('contest:sync_result', {
-      contestStatus: globalContest?.status || 'NOT_STARTED',
+      contestStatus,
       isTeamPaused: isPaused,
       powerupCounts,
       hintStage,
@@ -72,6 +86,7 @@ export function registerContestHandlers(socket: any, _io: any) {
       solvedProblemIds,
       bypassedProblemIds,
       currentRank,
+      lobbyTimeLeftMs,
       // Timing data for client-side timer synchronization
       endsAt: globalContest?.endsAt ? new Date(globalContest.endsAt).toISOString() : null,
       serverTime: new Date().toISOString(),

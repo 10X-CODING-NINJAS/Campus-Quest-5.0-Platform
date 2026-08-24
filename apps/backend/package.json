@@ -8,6 +8,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc --project tsconfig.json",
     "start": "node dist/index.js",
+    "start:worker": "node dist/worker-entry.js",
+    "start:api": "DISABLE_JUDGE_WORKER=true node dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "clean": "rm -rf dist",

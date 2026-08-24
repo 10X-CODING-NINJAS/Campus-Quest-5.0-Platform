@@ -16,11 +16,8 @@ export default function App() {
     const [questionNum, setQuestionNum] = useState(1);
     const [selectedLang, setSelectedLang] = useState('cpp');
     const [isSaved, setIsSaved] = useState(true);
-    const [securityWarning, setSecurityWarning] = useState(null);
-    const [violationCount, setViolationCount] = useState(0);
-    const [isAutoSubmitted, setIsAutoSubmitted] = useState(false);
     const [contestStatus, setContestStatus] = useState('NOT_STARTED');
-    const [isTeamPaused, setIsTeamPaused] = useState(false);
+    const [lobbyTimeLeftMs, setLobbyTimeLeftMs] = useState(0);
     const [powerupCounts, setPowerupCounts] = useState({ SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 });
     const [problems, setProblems] = useState([]);
     const [hintStage, setHintStage] = useState(0);
@@ -57,6 +54,13 @@ export default function App() {
             // CRITICAL-4: Store server-authoritative end time when contest starts
             if (data?.endsAt)
                 setContestEndsAt(data.endsAt);
+            socket.emit('contest:sync');
+        };
+        const handleLobbyStarted = (data) => {
+            setContestStatus('LOBBY');
+            if (data?.lobbyTimeLeftMs)
+                setLobbyTimeLeftMs(data.lobbyTimeLeftMs);
+            socket.emit('contest:sync');
         };
         // CRITICAL-5: contest:resumed is now distinct from contest:started
         const handleContestResumed = (data) => {
@@ -66,12 +70,17 @@ export default function App() {
                 setContestEndsAt(data.endsAt);
         };
         const handleContestPaused = () => setContestStatus('PAUSED');
-        const handleContestEnded = () => setContestStatus('ENDED');
-        const handleTeamPaused = () => setIsTeamPaused(true);
-        const handleTeamResumed = () => {
-            setIsTeamPaused(false);
-            setSecurityWarning(null);
+        const handleContestEnded = () => {
+            setContestStatus('ENDED');
+            solvedProblemIdsRef.current = new Set();
+            bypassedProblemIdsRef.current = new Set();
+            setSolvedCount(0);
+            setQuestionNum(1);
+            setLatestVerdict('none');
+            setMaxUnlockedQuestion(1);
         };
+        const handleTeamPaused = () => { }; // no-op: proctoring disabled
+        const handleTeamResumed = () => { }; // no-op: proctoring disabled
         const handleProgressUpdated = (data) => {
             if (data.hintStage > hintStage && data.hintStage > 0) {
                 let location = '';
@@ -88,19 +97,30 @@ export default function App() {
             setHintStage(data.hintStage);
             setSolvedCount(data.solvedCount);
         };
-        const handleDisqualifiedAll = () => {
-            setIsAutoSubmitted(true);
-            setSecurityWarning(null);
-        };
+        const handleDisqualifiedAll = () => { }; // no-op: proctoring disabled
         const handleSubmitResult = (result) => {
-            // C5: submit:result is now OWNED by RightPanel exclusively.
-            // App.tsx only updates latestVerdict and solved IDs from contest:sync_result.
             if (result.verdict) {
                 setLatestVerdict(result.verdict);
-                if (result.verdict === 'AC' && result.problemId) {
-                    if (!solvedProblemIdsRef.current.has(result.problemId)) {
-                        solvedProblemIdsRef.current.add(result.problemId);
-                        setSolvedCount(solvedProblemIdsRef.current.size);
+                const isSuccess = result.verdict === 'AC' || result.verdict === 'BYPASSED';
+                if (isSuccess && result.problemId) {
+                    const idx = problems.findIndex(p => p.id === result.problemId);
+                    if (idx !== -1) {
+                        const solvedId = result.problemId;
+                        if (result.verdict === 'AC') {
+                            solvedProblemIdsRef.current.add(solvedId);
+                            setSolvedCount(solvedProblemIdsRef.current.size);
+                        }
+                        else {
+                            bypassedProblemIdsRef.current.add(solvedId);
+                        }
+                        const newMax = solvedProblemIdsRef.current.size + bypassedProblemIdsRef.current.size + 1;
+                        setMaxUnlockedQuestion(newMax);
+                        if (questionNum === idx + 1) {
+                            const nextQ = Math.min(newMax, problems.length);
+                            if (nextQ > questionNum) {
+                                setQuestionNum(nextQ);
+                            }
+                        }
                     }
                 }
                 // Fire a sync to reconcile server state (rank, hints, etc)
@@ -111,7 +131,10 @@ export default function App() {
         const handlePowerupUpdated = (counts) => setPowerupCounts(counts);
         const handleSyncResult = (data) => {
             setContestStatus(data.contestStatus);
-            setIsTeamPaused(data.isTeamPaused);
+            if (data.lobbyTimeLeftMs !== undefined) {
+                setLobbyTimeLeftMs(data.lobbyTimeLeftMs);
+            }
+            // isTeamPaused removed — proctoring disabled
             if (data.powerupCounts)
                 setPowerupCounts(data.powerupCounts);
             // Handle hint stage with notification
@@ -135,18 +158,29 @@ export default function App() {
                 setSolvedCount(data.solvedCount);
             if (data.currentRank !== undefined)
                 setCurrentRank(data.currentRank);
-            if (data.solvedProblemIds) {
-                solvedProblemIdsRef.current = new Set(data.solvedProblemIds);
+            if (data.contestStatus === 'NOT_STARTED' || data.contestStatus === 'ENDED') {
+                solvedProblemIdsRef.current = new Set();
+                bypassedProblemIdsRef.current = new Set();
+                setSolvedCount(0);
+                setQuestionNum(1);
+                setLatestVerdict('none');
+                setMaxUnlockedQuestion(1);
             }
-            if (data.bypassedProblemIds) {
-                bypassedProblemIdsRef.current = new Set(data.bypassedProblemIds);
+            else {
+                if (data.solvedProblemIds) {
+                    solvedProblemIdsRef.current = new Set(data.solvedProblemIds);
+                }
+                if (data.bypassedProblemIds) {
+                    bypassedProblemIdsRef.current = new Set(data.bypassedProblemIds);
+                }
+                setMaxUnlockedQuestion(solvedProblemIdsRef.current.size + bypassedProblemIdsRef.current.size + 1);
             }
-            setMaxUnlockedQuestion(solvedProblemIdsRef.current.size + bypassedProblemIdsRef.current.size + 1);
             // CRITICAL-4: Restore timer from sync result (handles reconnects)
             if (data.endsAt)
                 setContestEndsAt(data.endsAt);
         };
         socket.on('contest:started', handleContestStarted);
+        socket.on('contest:lobby_started', handleLobbyStarted);
         socket.on('contest:resumed', handleContestResumed);
         socket.on('contest:paused', handleContestPaused);
         socket.on('contest:ended', handleContestEnded);
@@ -165,31 +199,10 @@ export default function App() {
         });
         // C4: Do NOT emit contest:sync here. The socket is not connected yet before login.
         // contest:sync is emitted by the reconnect handler after connectSocket() is called.
-        let unsubscribeSecurity;
-        if (window.electronAPI?.onSecurityViolation) {
-            unsubscribeSecurity = window.electronAPI.onSecurityViolation((type) => {
-                setViolationCount((prev) => {
-                    const newCount = prev + 1;
-                    if (newCount >= 5) {
-                        setIsAutoSubmitted(true);
-                        setSecurityWarning(null);
-                    }
-                    else {
-                        // Emit violation to backend — backend pauses the team and alerts admin
-                        socket.emit('violation:trigger', { type });
-                        setIsTeamPaused(true);
-                        setSecurityWarning(type === 'blur'
-                            ? `You switched away from the assessment window! (Violation ${newCount}/5)`
-                            : `You attempted to exit full screen mode! (Violation ${newCount}/5)`);
-                    }
-                    return newCount;
-                });
-            });
-        }
+        // NOTE: Security monitoring disabled — no proctoring for testing
         return () => {
-            if (unsubscribeSecurity)
-                unsubscribeSecurity();
             socket.off('contest:started', handleContestStarted);
+            socket.off('contest:lobby_started', handleLobbyStarted);
             socket.off('contest:resumed', handleContestResumed);
             socket.off('contest:paused', handleContestPaused);
             socket.off('contest:ended', handleContestEnded);
@@ -202,7 +215,7 @@ export default function App() {
             socket.off('contest:sync_result', handleSyncResult);
             socket.off('leaderboard:update');
         };
-    }, []); // MEDIUM-2: [] — register once, don't re-register on reconnect
+    }, [problems, questionNum]); // Re-bind if problems list or questionNum changes to ensure current reference exists in closure
     // MEDIUM-2: Reconnect handling in isolated effect
     useEffect(() => {
         const handleConnect = () => {
@@ -226,6 +239,15 @@ export default function App() {
             socket.off('connect_error', handleConnectError);
         };
     }, [reconnectState]);
+    // Auto-navigate screen based on contestStatus
+    useEffect(() => {
+        if (contestStatus === 'RUNNING' && currentScreen === 'lobby') {
+            setCurrentScreen('coding');
+        }
+        else if (contestStatus === 'LOBBY' && (currentScreen === 'coding' || currentScreen === 'hints')) {
+            setCurrentScreen('lobby');
+        }
+    }, [contestStatus, currentScreen]);
     // HIGH-5: No optimistic update — powerup:updated event from server is authoritative
     const handleUsePowerup = (type, problemId) => {
         socket.emit('powerup:use', { type, problemId });
@@ -243,9 +265,9 @@ export default function App() {
         return _jsx(Diagnostics, { onProceed: () => setCurrentScreen('lobby') });
     }
     if (currentScreen === 'lobby') {
-        return (_jsx(Lobby, { teamName: teamName, onTeamNameChange: setTeamName, onProceed: () => setCurrentScreen('coding') }));
+        return (_jsx(Lobby, { teamName: teamName, onTeamNameChange: setTeamName, onProceed: () => setCurrentScreen('coding'), lobbyTimeLeftMs: lobbyTimeLeftMs, contestStatus: contestStatus }));
     }
-    return (_jsxs("div", { className: "flex flex-col h-screen w-screen bg-[#080810] overflow-hidden text-white select-none relative", style: { backgroundImage: `url(${fullBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }, children: [contestStatus === 'NOT_STARTED' && (_jsx("div", { className: "absolute inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-md p-6", children: _jsxs("div", { className: "bg-[#080810] border-4 border-blue-500 rounded-xl p-10 max-w-2xl text-center shadow-[12px_12px_0px_0px_rgba(59,130,246,1)] comic-halftone", children: [_jsx("h1", { className: "text-5xl font-bold text-blue-500 mb-6 font-mono tracking-tighter uppercase", children: "WAITING FOR ADMIN" }), _jsx("p", { className: "text-xl text-white font-bold mb-8", children: "The contest will begin shortly. Please stand by." }), _jsx("div", { className: "flex justify-center items-center mb-4", children: _jsx("div", { className: "w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" }) })] }) })), isTeamPaused && !isAutoSubmitted && (_jsx("div", { className: "absolute inset-0 z-[70] flex items-center justify-center bg-red-900/90 backdrop-blur-md p-6", children: _jsxs("div", { className: "bg-black border-4 border-red-600 rounded-xl p-10 max-w-2xl text-center shadow-[12px_12px_0px_0px_rgba(220,38,38,1)] comic-halftone", children: [_jsx("h2", { className: "text-5xl font-bold text-red-500 mb-4 tracking-widest font-mono", children: "TEST PAUSED" }), _jsx("p", { className: "text-2xl text-white mb-6", children: securityWarning || `Security Violation Detected (Violation ${violationCount}/5).` }), _jsx("p", { className: "text-lg text-gray-300 mb-8 max-w-md mx-auto", children: "Your test session has been suspended by the anti-cheat system. You must wait for an administrator to review the logs and unlock your terminal." }), _jsx("div", { className: "inline-block px-6 py-3 border-2 border-red-600 text-red-500 font-mono text-sm uppercase tracking-widest animate-pulse", children: "PENDING ADMIN REVIEW..." })] }) })), isAutoSubmitted && (_jsx("div", { className: "absolute inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-6", children: _jsxs("div", { className: "bg-[#080810] border-4 border-red-600 rounded-xl p-10 max-w-2xl text-center shadow-[12px_12px_0px_0px_rgba(220,38,38,1)]", children: [_jsx("h1", { className: "text-6xl font-bold text-red-600 mb-6 font-mono tracking-tighter", children: "TEST TERMINATED" }), _jsx("p", { className: "text-2xl text-white font-bold mb-4", children: "Maximum security violations (5/5) reached." }), _jsx("p", { className: "text-lg text-gray-400 mb-8", children: "Your test has been automatically submitted. No further editing is permitted." }), _jsxs("div", { className: "flex justify-center items-center mb-8", children: [_jsx("span", { className: "text-red-500 animate-pulse", children: "\u25A0" }), _jsx("span", { className: "text-red-500 animate-pulse mx-2", style: { animationDelay: '150ms' }, children: "\u25A0" }), _jsx("span", { className: "text-red-500 animate-pulse", style: { animationDelay: '300ms' }, children: "\u25A0" })] }), _jsx("button", { onClick: () => window.electronAPI?.close(), className: "px-10 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded border-2 border-red-400 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-transform active:translate-y-1 active:translate-x-1 active:shadow-none text-xl tracking-widest", children: "EXIT PLATFORM" })] }) })), reconnectState !== 'IDLE' && (_jsxs("div", { className: `w-full py-2.5 px-4 border-b-4 border-black flex items-center justify-between text-xs font-mono font-bold select-none transition-all z-50 ${reconnectState === 'DISCONNECTED' ? 'bg-red-500 text-white animate-pulse' :
-                    reconnectState === 'RECONNECTING' ? 'bg-yellow-400 text-black animate-pulse' : 'bg-green-500 text-white'}`, children: [_jsxs("span", { className: "flex items-center gap-1.5", children: [reconnectState === 'DISCONNECTED' && "⚠️ DIMENSIONAL PORTAL INTERRUPTED • CHECK YOUR INTERNET ROUTER", reconnectState === 'RECONNECTING' && "⚡ DIMENSIONAL SYNAPSE DECAYING • RECONNECTING TO EARTH-1610 ANCHOR...", reconnectState === 'RESTORED' && "✓ MULTIVERSE RE-SYNCHRONIZED • WORKSPACE & CONTEST STATE RESTORED!"] }), _jsx("span", { className: "text-[9px] uppercase border border-black/25 px-1.5 py-0.5 bg-black/10", children: reconnectState === 'RESTORED' ? 'Resume Coding' : 'Do not close client' })] })), _jsx(TopBar, { isPaused: isTeamPaused || contestStatus !== 'RUNNING', teamName: teamName, onTeamNameChange: setTeamName, currentScreen: currentScreen, onNavigate: (screen) => setCurrentScreen(screen), hintStage: hintStage, contestEndsAt: contestEndsAt }), currentScreen === 'hints' ? (_jsx("div", { className: "flex-1 w-full relative min-h-0", children: _jsx(HintsPage, { hintStage: hintStage }) })) : (_jsxs("div", { className: "flex-1 flex overflow-auto p-6 gap-6 items-start justify-center", children: [_jsx(ProblemPanel, { questionNum: questionNum, setQuestionNum: setQuestionNum, currentProblem: problems[questionNum - 1] || null, totalProblems: problems.length, maxUnlockedQuestion: maxUnlockedQuestion, solvedProblemIds: solvedProblemIdsRef.current, bypassedProblemIds: bypassedProblemIdsRef.current, problems: problems }), _jsx(RightPanel, { questionNum: questionNum, selectedLang: selectedLang, setSelectedLang: setSelectedLang, isSaved: isSaved, setIsSaved: setIsSaved, powerupCounts: powerupCounts, onUsePowerup: handleUsePowerup, onUseSpideySenseSuccess: () => setCurrentScreen('hints'), currentProblem: problems[questionNum - 1] || null, teamId: teamId, teamName: teamName, solvedCount: solvedCount, currentRank: currentRank, latestVerdict: latestVerdict, hintStage: hintStage, totalProblems: problems.length })] }))] }));
+    return (_jsxs("div", { className: "flex flex-col h-screen w-screen bg-[#080810] overflow-hidden text-white select-none relative", style: { backgroundImage: `url(${fullBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }, children: [contestStatus === 'NOT_STARTED' && (_jsx("div", { className: "absolute inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-md p-6", children: _jsxs("div", { className: "bg-[#080810] border-4 border-blue-500 rounded-xl p-10 max-w-2xl text-center shadow-[12px_12px_0px_0px_rgba(59,130,246,1)] comic-halftone", children: [_jsx("h1", { className: "text-5xl font-bold text-blue-500 mb-6 font-mono tracking-tighter uppercase", children: "WAITING FOR ADMIN" }), _jsx("p", { className: "text-xl text-white font-bold mb-8", children: "The contest will begin shortly. Please stand by." }), _jsx("div", { className: "flex justify-center items-center mb-4", children: _jsx("div", { className: "w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" }) })] }) })), reconnectState !== 'IDLE' && (_jsxs("div", { className: `w-full py-2.5 px-4 border-b-4 border-black flex items-center justify-between text-xs font-mono font-bold select-none transition-all z-50 ${reconnectState === 'DISCONNECTED' ? 'bg-red-500 text-white animate-pulse' :
+                    reconnectState === 'RECONNECTING' ? 'bg-yellow-400 text-black animate-pulse' : 'bg-green-500 text-white'}`, children: [_jsxs("span", { className: "flex items-center gap-1.5", children: [reconnectState === 'DISCONNECTED' && "⚠️ DIMENSIONAL PORTAL INTERRUPTED • CHECK YOUR INTERNET ROUTER", reconnectState === 'RECONNECTING' && "⚡ DIMENSIONAL SYNAPSE DECAYING • RECONNECTING TO EARTH-1610 ANCHOR...", reconnectState === 'RESTORED' && "✓ MULTIVERSE RE-SYNCHRONIZED • WORKSPACE & CONTEST STATE RESTORED!"] }), _jsx("span", { className: "text-[9px] uppercase border border-black/25 px-1.5 py-0.5 bg-black/10", children: reconnectState === 'RESTORED' ? 'Resume Coding' : 'Do not close client' })] })), _jsx(TopBar, { isPaused: contestStatus !== 'RUNNING', teamName: teamName, onTeamNameChange: setTeamName, currentScreen: currentScreen, onNavigate: (screen) => setCurrentScreen(screen), hintStage: hintStage, contestEndsAt: contestEndsAt }), currentScreen === 'hints' ? (_jsx("div", { className: "flex-1 w-full relative min-h-0", children: _jsx(HintsPage, { hintStage: hintStage }) })) : (_jsxs("div", { className: "flex-1 flex overflow-auto p-6 gap-6 items-start justify-center", children: [_jsx(ProblemPanel, { questionNum: questionNum, setQuestionNum: setQuestionNum, currentProblem: problems[questionNum - 1] || null, totalProblems: problems.length, maxUnlockedQuestion: maxUnlockedQuestion, solvedProblemIds: solvedProblemIdsRef.current, bypassedProblemIds: bypassedProblemIdsRef.current, problems: problems }), _jsx(RightPanel, { questionNum: questionNum, selectedLang: selectedLang, setSelectedLang: setSelectedLang, isSaved: isSaved, setIsSaved: setIsSaved, powerupCounts: powerupCounts, onUsePowerup: handleUsePowerup, onUseSpideySenseSuccess: () => setCurrentScreen('hints'), currentProblem: problems[questionNum - 1] || null, teamId: teamId, teamName: teamName, solvedCount: solvedCount, currentRank: currentRank, latestVerdict: latestVerdict, hintStage: hintStage, totalProblems: problems.length })] }))] }));
 }
 //# sourceMappingURL=App.js.map

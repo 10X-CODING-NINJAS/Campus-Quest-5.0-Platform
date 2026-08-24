@@ -63,15 +63,27 @@ export async function seedTestTeams() {
 }
 
 export default async function adminRoutes(fastify: FastifyInstance) {
-  // Admin Auth Middleware
-  fastify.addHook('preHandler', async (request, _reply) => {
+  // ── Admin Login — validate ADMIN_SECRET, return it as a bearer token ─────────
+  // This is the entry point for the admin panel login form.
+  fastify.post('/admin/login', async (request, reply) => {
+    const { secret } = request.body as { secret?: string };
+    if (!secret || secret !== ADMIN_SECRET) {
+      return reply.code(401).send({ error: 'INVALID_SECRET', message: 'Invalid admin secret.' });
+    }
+    // Return the secret itself as the bearer token (stateless, no JWT needed for admin)
+    return { success: true, token: secret };
+  });
+
+  // ── Admin Auth Middleware — enforces 401 on all /admin/* routes ──────────────
+  fastify.addHook('preHandler', async (request, reply) => {
     // Only protect /admin/* paths (leave /api/* open for contest logic)
-    if (request.url.startsWith('/admin/')) {
-      const authHeader = request.headers.authorization;
-      // Allow if matches ADMIN_SECRET, or 'spidey_admin_2024', or if no strict auth enforcement needed
-      if (authHeader && authHeader !== `Bearer ${ADMIN_SECRET}` && authHeader !== 'Bearer spidey_admin_2024') {
-        // Still allow for now to bypass
-      }
+    if (!request.url.startsWith('/admin/')) return;
+    // /admin/login itself is exempt
+    if (request.url === '/admin/login') return;
+
+    const authHeader = request.headers.authorization;
+    if (!authHeader || authHeader !== `Bearer ${ADMIN_SECRET}`) {
+      return reply.code(401).send({ error: 'UNAUTHORIZED', message: 'Valid admin secret required.' });
     }
   });
 
@@ -86,33 +98,47 @@ export default async function adminRoutes(fastify: FastifyInstance) {
 
   // 1. Start Global Contest
   fastify.post('/admin/start-contest', async (_request, _reply) => {
-    // Assuming a single contest row for simplicity. In production, pass contestId.
     const allContests = await db.select().from(contests);
     const now = new Date();
     const durationMs = 7200000; // 2 hours
-    const endsAt = new Date(now.getTime() + durationMs);
+    const lobbyDurationMs = 900000; // 15 minutes
+    const startedAt = new Date(now.getTime() + lobbyDurationMs);
+    const endsAt = new Date(startedAt.getTime() + durationMs);
 
     if (allContests.length === 0) {
       await db.insert(contests).values({
-        status: 'RUNNING',
+        status: 'LOBBY',
         durationMs,
-        startedAt: now,
+        startedAt,
         endsAt,
         totalPausedMs: 0,
+        lobbyStartedAt: now,
+        lobbyDurationMs,
       });
     } else {
       await db.update(contests)
-        .set({ status: 'RUNNING', startedAt: now, endsAt, totalPausedMs: 0 })
+        .set({
+          status: 'LOBBY',
+          startedAt,
+          endsAt,
+          totalPausedMs: 0,
+          lobbyStartedAt: now,
+          lobbyDurationMs,
+        })
         .where(eq(contests.id, allContests[0].id));
     }
 
-    // Broadcast to all connected clients that contest started
+    // Broadcast to all connected clients that contest lobby started
     const io = (fastify as any).io;
     if (io) {
-      io.emit('contest:started', { endsAt: endsAt.toISOString(), serverTime: now.toISOString() });
+      io.emit('contest:lobby_started', {
+        startedAt: startedAt.toISOString(),
+        lobbyTimeLeftMs: lobbyDurationMs,
+        serverTime: now.toISOString(),
+      });
     }
 
-    return { success: true, message: 'Contest started globally' };
+    return { success: true, message: 'Contest lobby started globally' };
   });
 
   // 1b. Pause Global Contest
@@ -267,7 +293,11 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     }).from(problems).orderBy(problems.order);
 
     const problemsWithStarters = await Promise.all(allProblems.map(async (p) => {
-      const starterDir = path.resolve(process.cwd(), `../../problems/${p.id}/starter`);
+      // Use PROBLEMS_DIR env var (always set in Docker to /app/problems)
+      // Fall back to a path relative to the dist output for local dev.
+      const problemsBase = process.env.PROBLEMS_DIR ||
+        path.resolve(__dirname, '../../../problems');
+      const starterDir = path.join(problemsBase, p.id, 'starter');
       const starters: Record<string, string> = {};
       try {
         starters.c = await fs.readFile(path.join(starterDir, 'c.c'), 'utf8').catch(() => '');
@@ -331,9 +361,10 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     return { success: true, teamId: team.id, teamName: team.name, token };
   });
 
-  // 7. Test teams listing (dev only — used to show quick-login buttons)
+  // 7. Test teams listing (dev only — used to show quick-login buttons in the admin panel)
+  // Passwords are intentionally excluded — this endpoint is for display only.
   fastify.get('/api/test-teams', async (_request, _reply) => {
-    return TEST_TEAMS.map(t => ({ id: t.id, name: t.name, password: t.password }));
+    return TEST_TEAMS.map(t => ({ id: t.id, name: t.name }));
   });
 
   // 8. Get team state by teamId (used for reconnect sync)

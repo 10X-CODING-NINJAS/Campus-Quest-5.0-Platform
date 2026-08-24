@@ -25,8 +25,17 @@ function createWindow() {
   });
   if (isDev) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+    mainWindow.webContents.openDevTools({ mode: "detach" });
   } else {
     mainWindow.loadFile(path.join(__dirname, "../../dist/index.html"));
+  }
+  const apiUrl = process.env.CQ_API_URL || process.env.VITE_API_URL || "";
+  if (apiUrl) {
+    mainWindow.webContents.once("did-finish-load", () => {
+      mainWindow.webContents.executeJavaScript(
+        `window.__CQ_API_URL__ = ${JSON.stringify(apiUrl)};`
+      ).catch(console.error);
+    });
   }
   electron.ipcMain.on("window-minimize", () => {
     mainWindow.minimize();

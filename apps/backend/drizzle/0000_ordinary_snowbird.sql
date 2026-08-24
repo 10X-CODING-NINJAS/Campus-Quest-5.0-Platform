@@ -1,4 +1,4 @@
-CREATE TYPE "public"."contest_status" AS ENUM('NOT_STARTED', 'RUNNING', 'PAUSED', 'ENDED');--> statement-breakpoint
+CREATE TYPE "public"."contest_status" AS ENUM('NOT_STARTED', 'LOBBY', 'RUNNING', 'PAUSED', 'ENDED');--> statement-breakpoint
 CREATE TYPE "public"."language" AS ENUM('C', 'CPP', 'PYTHON', 'JAVA');--> statement-breakpoint
 CREATE TYPE "public"."powerup_type" AS ENUM('SPIDER_SENSE', 'WEB_FLUID', 'SUIT_TECH');--> statement-breakpoint
 CREATE TYPE "public"."submission_status" AS ENUM('PENDING', 'JUDGING', 'DONE');--> statement-breakpoint
@@ -11,7 +11,9 @@ CREATE TABLE "contests" (
 	"paused_at" timestamp,
 	"total_paused_ms" integer DEFAULT 0 NOT NULL,
 	"duration_ms" integer NOT NULL,
-	"ends_at" timestamp
+	"ends_at" timestamp,
+	"lobby_started_at" timestamp,
+	"lobby_duration_ms" integer DEFAULT 900000
 );
 --> statement-breakpoint
 CREATE TABLE "problems" (
@@ -87,4 +89,12 @@ ALTER TABLE "submissions" ADD CONSTRAINT "submissions_problem_id_problems_id_fk"
 ALTER TABLE "team_powerups" ADD CONSTRAINT "team_powerups_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "violations" ADD CONSTRAINT "violations_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "team_workspaces" ADD CONSTRAINT "team_workspaces_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "team_workspaces" ADD CONSTRAINT "team_workspaces_problem_id_problems_id_fk" FOREIGN KEY ("problem_id") REFERENCES "public"."problems"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "team_workspaces" ADD CONSTRAINT "team_workspaces_problem_id_problems_id_fk" FOREIGN KEY ("problem_id") REFERENCES "public"."problems"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "problems_order_idx" ON "problems" ("order");--> statement-breakpoint
+CREATE INDEX "submissions_team_id_idx" ON "submissions" ("team_id");--> statement-breakpoint
+CREATE INDEX "submissions_problem_id_idx" ON "submissions" ("problem_id");--> statement-breakpoint
+CREATE INDEX "submissions_verdict_idx" ON "submissions" ("verdict");--> statement-breakpoint
+CREATE INDEX "submissions_created_at_idx" ON "submissions" ("created_at");--> statement-breakpoint
+CREATE INDEX "violations_team_id_idx" ON "violations" ("team_id");--> statement-breakpoint
+CREATE INDEX "team_powerups_team_id_idx" ON "team_powerups" ("team_id");--> statement-breakpoint
+CREATE INDEX "team_workspaces_team_id_problem_id_idx" ON "team_workspaces" ("team_id", "problem_id");

@@ -51,17 +51,23 @@
   "build": {
     "appId": "com.campusquest.platform",
     "productName": "Campus Quest 5.0",
+    "asar": true,
     "directories": {
       "output": "release/${version}"
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "!node_modules/**",
+      "!src/**",
+      "!*.ts",
+      "!*.tsx"
     ],
     "mac": {
       "identity": null,
       "icon": "resources/icon.icns",
       "category": "public.app-category.education",
+      "hardenedRuntime": false,
       "target": [
         {
           "target": "dmg",
@@ -82,6 +88,14 @@
           ]
         }
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "resources/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Campus Quest 5.0"
     },
     "linux": {
       "icon": "resources/icon.png",

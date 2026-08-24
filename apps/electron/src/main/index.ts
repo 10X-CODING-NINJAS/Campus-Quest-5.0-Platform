@@ -23,8 +23,21 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL as string);
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
+  }
+
+  // Inject Railway API URL into renderer at runtime.
+  // Allows repointing the binary to a different backend by setting CQ_API_URL
+  // in the launch environment (e.g., a contest-day URL change) without recompiling.
+  const apiUrl = process.env.CQ_API_URL || process.env.VITE_API_URL || '';
+  if (apiUrl) {
+    mainWindow.webContents.once('did-finish-load', () => {
+      mainWindow.webContents.executeJavaScript(
+        `window.__CQ_API_URL__ = ${JSON.stringify(apiUrl)};`
+      ).catch(console.error);
+    });
   }
 
   // Handle custom window controls via IPC

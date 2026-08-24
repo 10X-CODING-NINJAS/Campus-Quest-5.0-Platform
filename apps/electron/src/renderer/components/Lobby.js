@@ -8,18 +8,27 @@ import lobbyBg from '../../Assets/Page 3.png';
 import GlitchText from './GlitchText';
 import TopBar from './TopBar';
 import { socket } from '../lib/socket';
-export default function Lobby({ onProceed, teamName, onTeamNameChange }) {
-    const [timeLeft, setTimeLeft] = useState(120); // cosmetic countdown while waiting
+export default function Lobby({ onProceed, teamName, onTeamNameChange, lobbyTimeLeftMs = 0, contestStatus }) {
+    const [timeLeft, setTimeLeft] = useState(0);
     const [isStarting, setIsStarting] = useState(false);
-    // 1. Cosmetic countdown timer (does NOT trigger lobby exit)
+    // Synchronize local timeLeft state when lobbyTimeLeftMs prop changes from parent
     useEffect(() => {
-        if (timeLeft <= 0)
+        if (contestStatus === 'NOT_STARTED') {
+            setTimeLeft(900); // 15:00
+        }
+        else {
+            setTimeLeft(Math.max(0, Math.ceil(lobbyTimeLeftMs / 1000)));
+        }
+    }, [lobbyTimeLeftMs, contestStatus]);
+    // Server-synced countdown timer
+    useEffect(() => {
+        if (timeLeft <= 0 || contestStatus === 'NOT_STARTED')
             return;
         const timer = setInterval(() => {
-            setTimeLeft(prev => prev - 1);
+            setTimeLeft(prev => Math.max(0, prev - 1));
         }, 1000);
         return () => clearInterval(timer);
-    }, [timeLeft]);
+    }, [timeLeft, contestStatus]);
     // HIGH-8: Lobby exits ONLY when admin fires 'contest:started' from the backend.
     // The previous fake team counter that auto-proceeded after ~2 min has been removed.
     useEffect(() => {

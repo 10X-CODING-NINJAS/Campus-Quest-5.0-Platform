@@ -24,7 +24,9 @@
     "db:generate": "turbo run db:generate --filter=@campus-quest/backend",
     "db:migrate": "turbo run db:migrate --filter=@campus-quest/backend",
     "db:studio": "turbo run db:studio --filter=@campus-quest/backend",
-    "db:seed": "turbo run db:seed --filter=@campus-quest/backend"
+    "db:seed": "turbo run db:seed --filter=@campus-quest/backend",
+    "start:api": "npm run start:api --prefix apps/backend",
+    "start:worker": "npm run start:worker --prefix apps/backend"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

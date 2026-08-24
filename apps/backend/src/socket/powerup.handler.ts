@@ -107,7 +107,6 @@ export function registerPowerupHandlers(socket: any, io: any) {
           });
         });
         
-        socket.emit('powerup:updated', { type, remaining: team.spiderSenseCharges - 1 });
         socket.emit('submit:result', { 
           status: 'DONE', 
           verdict: 'BYPASSED',

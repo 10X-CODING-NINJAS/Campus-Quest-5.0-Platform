@@ -16,7 +16,8 @@ export default function App() {
   const [questionNum, setQuestionNum] = useState(1);
   const [selectedLang, setSelectedLang] = useState('cpp');
   const [isSaved, setIsSaved] = useState(true);
-  const [contestStatus, setContestStatus] = useState<'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'ENDED'>('NOT_STARTED');
+  const [contestStatus, setContestStatus] = useState<'NOT_STARTED' | 'LOBBY' | 'RUNNING' | 'PAUSED' | 'ENDED'>('NOT_STARTED');
+  const [lobbyTimeLeftMs, setLobbyTimeLeftMs] = useState<number>(0);
   const [powerupCounts, setPowerupCounts] = useState({ SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 });
   const [problems, setProblems] = useState<any[]>([]);
   const [hintStage, setHintStage] = useState(0);
@@ -53,6 +54,13 @@ export default function App() {
       setContestStatus('RUNNING');
       // CRITICAL-4: Store server-authoritative end time when contest starts
       if (data?.endsAt) setContestEndsAt(data.endsAt);
+      socket.emit('contest:sync');
+    };
+
+    const handleLobbyStarted = (data?: { lobbyTimeLeftMs?: number }) => {
+      setContestStatus('LOBBY');
+      if (data?.lobbyTimeLeftMs) setLobbyTimeLeftMs(data.lobbyTimeLeftMs);
+      socket.emit('contest:sync');
     };
 
     // CRITICAL-5: contest:resumed is now distinct from contest:started
@@ -63,7 +71,15 @@ export default function App() {
     };
 
     const handleContestPaused = () => setContestStatus('PAUSED');
-    const handleContestEnded = () => setContestStatus('ENDED');
+    const handleContestEnded = () => {
+      setContestStatus('ENDED');
+      solvedProblemIdsRef.current = new Set();
+      bypassedProblemIdsRef.current = new Set();
+      setSolvedCount(0);
+      setQuestionNum(1);
+      setLatestVerdict('none');
+      setMaxUnlockedQuestion(1);
+    };
     const handleTeamPaused = () => {}; // no-op: proctoring disabled
     const handleTeamResumed = () => {}; // no-op: proctoring disabled
     const handleProgressUpdated = (data: { hintStage: number; solvedCount: number }) => {
@@ -82,14 +98,29 @@ export default function App() {
     };
     const handleDisqualifiedAll = () => {}; // no-op: proctoring disabled
     const handleSubmitResult = (result: any) => {
-      // C5: submit:result is now OWNED by RightPanel exclusively.
-      // App.tsx only updates latestVerdict and solved IDs from contest:sync_result.
       if (result.verdict) {
         setLatestVerdict(result.verdict);
-        if (result.verdict === 'AC' && result.problemId) {
-          if (!solvedProblemIdsRef.current.has(result.problemId)) {
-            solvedProblemIdsRef.current.add(result.problemId);
-            setSolvedCount(solvedProblemIdsRef.current.size);
+        
+        const isSuccess = result.verdict === 'AC' || result.verdict === 'BYPASSED';
+        if (isSuccess && result.problemId) {
+          const idx = problems.findIndex(p => p.id === result.problemId);
+          if (idx !== -1) {
+            const solvedId = result.problemId;
+            if (result.verdict === 'AC') {
+              solvedProblemIdsRef.current.add(solvedId);
+              setSolvedCount(solvedProblemIdsRef.current.size);
+            } else {
+              bypassedProblemIdsRef.current.add(solvedId);
+            }
+            const newMax = solvedProblemIdsRef.current.size + bypassedProblemIdsRef.current.size + 1;
+            setMaxUnlockedQuestion(newMax);
+
+            if (questionNum === idx + 1) {
+              const nextQ = Math.min(newMax, problems.length);
+              if (nextQ > questionNum) {
+                setQuestionNum(nextQ);
+              }
+            }
           }
         }
         // Fire a sync to reconcile server state (rank, hints, etc)
@@ -100,6 +131,9 @@ export default function App() {
     const handlePowerupUpdated = (counts: any) => setPowerupCounts(counts);
     const handleSyncResult = (data: any) => {
       setContestStatus(data.contestStatus);
+      if (data.lobbyTimeLeftMs !== undefined) {
+        setLobbyTimeLeftMs(data.lobbyTimeLeftMs);
+      }
       // isTeamPaused removed — proctoring disabled
       if (data.powerupCounts) setPowerupCounts(data.powerupCounts);
       
@@ -122,19 +156,29 @@ export default function App() {
       if (data.solvedCount !== undefined) setSolvedCount(data.solvedCount);
       if (data.currentRank !== undefined) setCurrentRank(data.currentRank);
       
-      if (data.solvedProblemIds) {
-        solvedProblemIdsRef.current = new Set(data.solvedProblemIds);
+      if (data.contestStatus === 'NOT_STARTED' || data.contestStatus === 'ENDED') {
+        solvedProblemIdsRef.current = new Set();
+        bypassedProblemIdsRef.current = new Set();
+        setSolvedCount(0);
+        setQuestionNum(1);
+        setLatestVerdict('none');
+        setMaxUnlockedQuestion(1);
+      } else {
+        if (data.solvedProblemIds) {
+          solvedProblemIdsRef.current = new Set(data.solvedProblemIds);
+        }
+        if (data.bypassedProblemIds) {
+          bypassedProblemIdsRef.current = new Set(data.bypassedProblemIds);
+        }
+        setMaxUnlockedQuestion(solvedProblemIdsRef.current.size + bypassedProblemIdsRef.current.size + 1);
       }
-      if (data.bypassedProblemIds) {
-        bypassedProblemIdsRef.current = new Set(data.bypassedProblemIds);
-      }
-      setMaxUnlockedQuestion(solvedProblemIdsRef.current.size + bypassedProblemIdsRef.current.size + 1);
 
       // CRITICAL-4: Restore timer from sync result (handles reconnects)
       if (data.endsAt) setContestEndsAt(data.endsAt);
     };
 
     socket.on('contest:started', handleContestStarted);
+    socket.on('contest:lobby_started', handleLobbyStarted);
     socket.on('contest:resumed', handleContestResumed);
     socket.on('contest:paused', handleContestPaused);
     socket.on('contest:ended', handleContestEnded);
@@ -142,13 +186,14 @@ export default function App() {
     socket.on('team:resumed', handleTeamResumed);
     socket.on('team:progress_updated', handleProgressUpdated);
     socket.on('team:disqualified_all', handleDisqualifiedAll);
+    const handleLeaderboardUpdate = (data: any) => {
+      if (data.currentRank !== undefined) setCurrentRank(data.currentRank);
+      if (data.solvedCount !== undefined) setSolvedCount(data.solvedCount);
+    };
     socket.on('submit:result', handleSubmitResult);
     socket.on('powerup:updated', handlePowerupUpdated);
     socket.on('contest:sync_result', handleSyncResult);
-    socket.on('leaderboard:update', (data: any) => {
-      if (data.currentRank !== undefined) setCurrentRank(data.currentRank);
-      if (data.solvedCount !== undefined) setSolvedCount(data.solvedCount);
-    });
+    socket.on('leaderboard:update', handleLeaderboardUpdate);
 
     // C4: Do NOT emit contest:sync here. The socket is not connected yet before login.
     // contest:sync is emitted by the reconnect handler after connectSocket() is called.
@@ -158,6 +203,7 @@ export default function App() {
 
     return () => {
       socket.off('contest:started', handleContestStarted);
+      socket.off('contest:lobby_started', handleLobbyStarted);
       socket.off('contest:resumed', handleContestResumed);
       socket.off('contest:paused', handleContestPaused);
       socket.off('contest:ended', handleContestEnded);
@@ -168,35 +214,63 @@ export default function App() {
       socket.off('submit:result', handleSubmitResult);
       socket.off('powerup:updated', handlePowerupUpdated);
       socket.off('contest:sync_result', handleSyncResult);
-      socket.off('leaderboard:update');
+      socket.off('leaderboard:update', handleLeaderboardUpdate);
     };
-  }, []); // MEDIUM-2: [] — register once, don't re-register on reconnect
+  }, [problems, questionNum]); // Re-bind if problems list or questionNum changes to ensure current reference exists in closure
 
-  // MEDIUM-2: Reconnect handling in isolated effect
+  // MEDIUM-2: Reconnect handling in isolated effect.
+  // dep=[] so listeners are registered exactly once for the app lifetime.
   useEffect(() => {
+    const wasReconnecting = { value: false };
+
     const handleConnect = () => {
-      setReconnectState(prev => {
-        if (prev === 'RECONNECTING' || prev === 'DISCONNECTED') {
-          socket.emit('contest:sync');
-          setTimeout(() => setReconnectState('IDLE'), 3500);
-          return 'RESTORED';
-        }
-        return 'IDLE';
-      });
+      if (wasReconnecting.value) {
+        // Authoritative server-state sync on every reconnect
+        socket.emit('contest:sync');
+        setReconnectState('RESTORED');
+        setTimeout(() => setReconnectState('IDLE'), 3500);
+      } else {
+        setReconnectState('IDLE');
+      }
+      wasReconnecting.value = false;
     };
-    const handleDisconnect = () => setReconnectState('DISCONNECTED');
-    const handleConnectError = () => setReconnectState('RECONNECTING');
+
+    const handleDisconnect = () => {
+      wasReconnecting.value = true;
+      setReconnectState('DISCONNECTED');
+    };
+
+    const handleConnectError = () => {
+      wasReconnecting.value = true;
+      setReconnectState('RECONNECTING');
+    };
+
+    const handleReconnectAttempt = () => {
+      wasReconnecting.value = true;
+      setReconnectState('RECONNECTING');
+    };
 
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('connect_error', handleConnectError);
+    socket.io.on('reconnect_attempt', handleReconnectAttempt);
 
     return () => {
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('connect_error', handleConnectError);
+      socket.io.off('reconnect_attempt', handleReconnectAttempt);
     };
-  }, [reconnectState]);
+  }, []); // Intentionally empty: register once per app lifetime
+
+  // Auto-navigate screen based on contestStatus
+  useEffect(() => {
+    if (contestStatus === 'RUNNING' && currentScreen === 'lobby') {
+      setCurrentScreen('coding');
+    } else if (contestStatus === 'LOBBY' && (currentScreen === 'coding' || currentScreen === 'hints')) {
+      setCurrentScreen('lobby');
+    }
+  }, [contestStatus, currentScreen]);
 
   // HIGH-5: No optimistic update — powerup:updated event from server is authoritative
   const handleUsePowerup = (type: 'SPIDER_SENSE' | 'WEB_FLUID' | 'SUIT_TECH', problemId?: string) => {
@@ -223,6 +297,8 @@ export default function App() {
         teamName={teamName} 
         onTeamNameChange={setTeamName} 
         onProceed={() => setCurrentScreen('coding')} 
+        lobbyTimeLeftMs={lobbyTimeLeftMs}
+        contestStatus={contestStatus}
       />
     );
   }

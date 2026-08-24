@@ -196,8 +196,25 @@ solvedCount, currentRank, latestVerdict, hintStage, totalProblems }) {
         };
         const onSubmitResult = (result) => {
             setSubmissionProgress({ stage: 'DONE', currentTest: 0, totalTests: 0 });
+            // Handle REJECTED status (contest not running, team paused, rate limit, etc.)
+            if (result.status === 'REJECTED') {
+                setConsoleLogs([
+                    "⚠ Submission Rejected:",
+                    result.message || 'Server rejected the submission.',
+                ]);
+                setSubmissionResult({
+                    status: 'FAILED',
+                    message: result.message || 'Submission rejected by server.',
+                    passedCount: 0,
+                    totalCount: 0,
+                });
+                setModalStatus('FAILED');
+                setIsModalOpen(true);
+                return;
+            }
             const verdict = result.verdict;
-            const results = result.testCaseResults || [];
+            // Backend sends 'testCases', not 'testCaseResults'
+            const results = result.testCases || result.testCaseResults || [];
             const passed = results.filter((r) => r.verdict === 'AC').length;
             setConsoleLogs([
                 "⚙ Compiling code...",

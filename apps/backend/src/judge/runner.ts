@@ -83,6 +83,161 @@ export async function runInSandbox(
   }
 }
 
+export interface BatchResult {
+  overallVerdict: 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE';
+  compileTimeMs: number;
+  results: Array<{
+    index: number;
+    verdict: 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE';
+    runtimeMs: number;
+    stdout: string;
+    stderr: string;
+  }>;
+}
+
+export async function runBatchInSandbox(
+  language: SupportedLanguage,
+  code: string,
+  testCases: Array<{ input: string; output: string }>,
+  onProgress?: (stage: 'COMPILING' | 'RUNNING', currentTest: number) => void,
+): Promise<BatchResult> {
+  const workDir = await mkdtemp(path.join(tmpdir(), 'judge-batch-'));
+  const timeoutMs = TIMEOUT_LIMITS[language] || 2000;
+  let compileTimeMs = 0;
+
+  try {
+    // 1. Preparation & Compilation Stage
+    onProgress?.('COMPILING', 0);
+
+    if (language === 'python') {
+      const filePath = path.join(workDir, 'main.py');
+      await writeFile(filePath, code, 'utf8');
+
+      const results = [];
+      let overallVerdict: 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE' = 'AC';
+
+      for (let i = 0; i < testCases.length; i++) {
+        onProgress?.('RUNNING', i + 1);
+        const tc = testCases[i];
+        const res = await executeCommand('python3', [filePath], tc.input, timeoutMs, tc.output);
+        results.push({
+          index: i,
+          verdict: res.verdict,
+          runtimeMs: res.runtimeMs,
+          stdout: res.stdout,
+          stderr: res.stderr,
+        });
+
+        if (res.verdict !== 'AC') {
+          overallVerdict = res.verdict;
+          break; // Stop on first error
+        }
+      }
+
+      return { overallVerdict, compileTimeMs, results };
+    }
+
+    if (language === 'c' || language === 'cpp') {
+      const ext = language === 'c' ? 'c' : 'cpp';
+      const compiler = language === 'c' ? 'gcc' : 'g++';
+      const srcPath = path.join(workDir, `main.${ext}`);
+      const binPath = path.join(workDir, 'out');
+      await writeFile(srcPath, code, 'utf8');
+
+      const startCompile = Date.now();
+      const compileResult = await runCompiler(compiler, ['-O2', srcPath, '-o', binPath]);
+      compileTimeMs = Date.now() - startCompile;
+
+      if (compileResult.exitCode !== 0) {
+        return {
+          overallVerdict: 'CE',
+          compileTimeMs,
+          results: [{
+            index: 0,
+            verdict: 'CE',
+            runtimeMs: 0,
+            stdout: '',
+            stderr: compileResult.stderr || 'Compilation Error',
+          }],
+        };
+      }
+
+      const results = [];
+      let overallVerdict: 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE' = 'AC';
+
+      for (let i = 0; i < testCases.length; i++) {
+        onProgress?.('RUNNING', i + 1);
+        const tc = testCases[i];
+        const res = await executeCommand(binPath, [], tc.input, timeoutMs, tc.output);
+        results.push({
+          index: i,
+          verdict: res.verdict,
+          runtimeMs: res.runtimeMs,
+          stdout: res.stdout,
+          stderr: res.stderr,
+        });
+
+        if (res.verdict !== 'AC') {
+          overallVerdict = res.verdict;
+          break; // Stop on first error
+        }
+      }
+
+      return { overallVerdict, compileTimeMs, results };
+    }
+
+    if (language === 'java') {
+      const srcPath = path.join(workDir, 'Main.java');
+      await writeFile(srcPath, code, 'utf8');
+
+      const startCompile = Date.now();
+      const compileResult = await runCompiler('javac', [srcPath]);
+      compileTimeMs = Date.now() - startCompile;
+
+      if (compileResult.exitCode !== 0) {
+        return {
+          overallVerdict: 'CE',
+          compileTimeMs,
+          results: [{
+            index: 0,
+            verdict: 'CE',
+            runtimeMs: 0,
+            stdout: '',
+            stderr: compileResult.stderr || 'Compilation Error',
+          }],
+        };
+      }
+
+      const results = [];
+      let overallVerdict: 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE' = 'AC';
+
+      for (let i = 0; i < testCases.length; i++) {
+        onProgress?.('RUNNING', i + 1);
+        const tc = testCases[i];
+        const res = await executeCommand('java', ['-cp', workDir, 'Main'], tc.input, timeoutMs, tc.output);
+        results.push({
+          index: i,
+          verdict: res.verdict,
+          runtimeMs: res.runtimeMs,
+          stdout: res.stdout,
+          stderr: res.stderr,
+        });
+
+        if (res.verdict !== 'AC') {
+          overallVerdict = res.verdict;
+          break; // Stop on first error
+        }
+      }
+
+      return { overallVerdict, compileTimeMs, results };
+    }
+
+    throw new Error(`Unsupported language: ${language}`);
+  } finally {
+    await rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 const MAX_OUTPUT_SIZE = 1024 * 1024; // 1MB limit for stdout/stderr to prevent OOM
 
 function runCompiler(cmd: string, args: string[]): Promise<{ exitCode: number; stderr: string }> {
