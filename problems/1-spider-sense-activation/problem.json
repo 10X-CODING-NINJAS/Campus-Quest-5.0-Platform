@@ -1,0 +1,15 @@
+{
+  "id": "1-spider-sense-activation",
+  "title": "Spider Sense Activation",
+  "difficulty": "Easy",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "checkerType": "default",
+  "order": 1
+}

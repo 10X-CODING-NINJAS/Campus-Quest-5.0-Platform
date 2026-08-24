@@ -1,0 +1,15 @@
+{
+  "id": "14-web-fluid-patrol",
+  "title": "Web-Fluid Patrol",
+  "difficulty": "Medium",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "checkerType": "default",
+  "order": 14
+}

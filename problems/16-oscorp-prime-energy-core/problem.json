@@ -1,0 +1,15 @@
+{
+  "id": "16-oscorp-prime-energy-core",
+  "title": "Oscorp Prime Energy Core",
+  "difficulty": "Difficult",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "checkerType": "default",
+  "order": 16
+}

@@ -77,7 +77,7 @@ async function runStressTest() {
       const test = STRESS_TESTS[currentTest];
       console.log(`\nDispatching: ${test.name}`);
       socket.emit('run:code', { 
-        problemId: '1-two-sum', 
+        problemId: '1-spider-sense-activation', 
         code: test.code, 
         language: test.language, 
         stdin: 'test input' 

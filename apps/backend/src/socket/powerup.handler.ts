@@ -62,7 +62,7 @@ export function registerPowerupHandlers(socket: any, io: any) {
           return;
         }
 
-        if (problemId === '10-final-mission') {
+        if (problemId === '17-multiverse-villain-hunt' || problemId === '10-final-mission') {
           socket.emit('powerup:error', { message: 'Spider-Sense cannot be used on the Final Mission.' });
           return;
         }

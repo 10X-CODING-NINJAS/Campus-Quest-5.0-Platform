@@ -1,0 +1,15 @@
+{
+  "id": "6-web-cartridge-countdown",
+  "title": "Web Cartridge Countdown",
+  "difficulty": "Easy",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "checkerType": "default",
+  "order": 6
+}

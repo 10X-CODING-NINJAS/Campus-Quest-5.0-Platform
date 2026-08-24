@@ -68,14 +68,14 @@ async function startSimulation() {
       // Simulate submission
       console.log(`[${randomTeam.team}] Submitting random code...`);
       randomTeam.socket.emit('submit:code', {
-        problemId: '1-two-sum',
+        problemId: '1-spider-sense-activation',
         language: 'python',
         code: `print('simulated')`
       });
     } else if (action < 0.8) {
       // Simulate Spider-Sense
       console.log(`[${randomTeam.team}] Using Spider-Sense!`);
-      randomTeam.socket.emit('powerup:use', { type: 'SPIDER_SENSE', problemId: '1-two-sum' });
+      randomTeam.socket.emit('powerup:use', { type: 'SPIDER_SENSE', problemId: '1-spider-sense-activation' });
     } else {
       // Simulate reconnect
       console.log(`[${randomTeam.team}] Disconnecting and reconnecting...`);

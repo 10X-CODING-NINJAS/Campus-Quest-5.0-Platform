@@ -1,0 +1,15 @@
+{
+  "id": "8-graffiti-danger-signal",
+  "title": "Graffiti Danger Signal",
+  "difficulty": "Medium",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "checkerType": "default",
+  "order": 8
+}

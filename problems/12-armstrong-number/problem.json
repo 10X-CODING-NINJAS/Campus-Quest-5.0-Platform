@@ -1,0 +1,15 @@
+{
+  "id": "12-armstrong-number",
+  "title": "Armstrong Number",
+  "difficulty": "Difficult",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "checkerType": "default",
+  "order": 12
+}

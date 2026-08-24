@@ -1,0 +1,15 @@
+{
+  "id": "5-spider-man-vs-hulk",
+  "title": "Spider-Man vs Hulk \u2014 Strength Battle",
+  "difficulty": "Easy",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "checkerType": "default",
+  "order": 5
+}

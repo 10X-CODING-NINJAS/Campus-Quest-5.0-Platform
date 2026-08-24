@@ -1,0 +1,15 @@
+{
+  "id": "13-web-shooter-calibration",
+  "title": "Web-Shooter Calibration",
+  "difficulty": "Hard",
+  "timeLimit": 2000,
+  "memoryLimit": 256,
+  "supportedLanguages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "checkerType": "default",
+  "order": 13
+}
