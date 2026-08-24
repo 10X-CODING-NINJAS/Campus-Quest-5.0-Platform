@@ -219,7 +219,7 @@ export default function App() {
     );
   }
 
-  const handleAction = async (action: 'start' | 'pause' | 'resume' | 'stop') => {
+  const handleAction = async (action: 'start' | 'pause' | 'resume' | 'stop' | 'reset') => {
     try {
       setError(null);
       let endpoint = '';
@@ -227,8 +227,9 @@ export default function App() {
       else if (action === 'pause') endpoint = '/pause-contest';
       else if (action === 'resume') endpoint = '/resume-contest';
       else if (action === 'stop') endpoint = '/emergency-stop';
+      else if (action === 'reset') endpoint = '/reset-contest';
       await axios.post(`${API_URL}${endpoint}`);
-      setContestStatus(action === 'stop' ? 'ENDED' : action === 'start' || action === 'resume' ? 'RUNNING' : 'PAUSED');
+      setContestStatus(action === 'stop' ? 'ENDED' : action === 'reset' ? 'NOT_STARTED' : action === 'start' || action === 'resume' ? 'RUNNING' : 'PAUSED');
       fetchData();
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'An error occurred');
@@ -338,6 +339,9 @@ export default function App() {
             </button>
             <button onClick={() => handleAction('stop')} className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-mono text-xs font-bold uppercase border-2 border-black shadow-[2px_2px_0_#000] active:translate-y-0.5 active:shadow-none">
               ⚠️ EMERGENCY STOP
+            </button>
+            <button onClick={() => handleAction('reset')} className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-mono text-xs font-bold uppercase border-2 border-black shadow-[2px_2px_0_#000] active:translate-y-0.5 active:shadow-none">
+              🔄 RESET ALL SCORES
             </button>
           </div>
         </section>

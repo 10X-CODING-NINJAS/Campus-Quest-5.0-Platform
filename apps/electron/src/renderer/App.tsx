@@ -16,11 +16,7 @@ export default function App() {
   const [questionNum, setQuestionNum] = useState(1);
   const [selectedLang, setSelectedLang] = useState('cpp');
   const [isSaved, setIsSaved] = useState(true);
-  const [securityWarning, setSecurityWarning] = useState<string | null>(null);
-  const [violationCount, setViolationCount] = useState(0);
-  const [isAutoSubmitted, setIsAutoSubmitted] = useState(false);
   const [contestStatus, setContestStatus] = useState<'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'ENDED'>('NOT_STARTED');
-  const [isTeamPaused, setIsTeamPaused] = useState(false);
   const [powerupCounts, setPowerupCounts] = useState({ SPIDER_SENSE: 0, WEB_FLUID: 0, SUIT_TECH: 0 });
   const [problems, setProblems] = useState<any[]>([]);
   const [hintStage, setHintStage] = useState(0);
@@ -68,11 +64,8 @@ export default function App() {
 
     const handleContestPaused = () => setContestStatus('PAUSED');
     const handleContestEnded = () => setContestStatus('ENDED');
-    const handleTeamPaused = () => setIsTeamPaused(true);
-    const handleTeamResumed = () => {
-      setIsTeamPaused(false);
-      setSecurityWarning(null);
-    };
+    const handleTeamPaused = () => {}; // no-op: proctoring disabled
+    const handleTeamResumed = () => {}; // no-op: proctoring disabled
     const handleProgressUpdated = (data: { hintStage: number; solvedCount: number }) => {
       if (data.hintStage > hintStage && data.hintStage > 0) {
         let location = '';
@@ -87,10 +80,7 @@ export default function App() {
       setHintStage(data.hintStage);
       setSolvedCount(data.solvedCount);
     };
-    const handleDisqualifiedAll = () => {
-      setIsAutoSubmitted(true);
-      setSecurityWarning(null);
-    };
+    const handleDisqualifiedAll = () => {}; // no-op: proctoring disabled
     const handleSubmitResult = (result: any) => {
       // C5: submit:result is now OWNED by RightPanel exclusively.
       // App.tsx only updates latestVerdict and solved IDs from contest:sync_result.
@@ -110,7 +100,7 @@ export default function App() {
     const handlePowerupUpdated = (counts: any) => setPowerupCounts(counts);
     const handleSyncResult = (data: any) => {
       setContestStatus(data.contestStatus);
-      setIsTeamPaused(data.isTeamPaused);
+      // isTeamPaused removed — proctoring disabled
       if (data.powerupCounts) setPowerupCounts(data.powerupCounts);
       
       // Handle hint stage with notification
@@ -163,31 +153,10 @@ export default function App() {
     // C4: Do NOT emit contest:sync here. The socket is not connected yet before login.
     // contest:sync is emitted by the reconnect handler after connectSocket() is called.
 
-    let unsubscribeSecurity: (() => void) | undefined;
-    if ((window as any).electronAPI?.onSecurityViolation) {
-      unsubscribeSecurity = (window as any).electronAPI.onSecurityViolation((type: string) => {
-        setViolationCount((prev) => {
-          const newCount = prev + 1;
-          if (newCount >= 5) {
-            setIsAutoSubmitted(true);
-            setSecurityWarning(null);
-          } else {
-            // Emit violation to backend — backend pauses the team and alerts admin
-            socket.emit('violation:trigger', { type });
-            setIsTeamPaused(true);
-            setSecurityWarning(
-              type === 'blur'
-                ? `You switched away from the assessment window! (Violation ${newCount}/5)`
-                : `You attempted to exit full screen mode! (Violation ${newCount}/5)`
-            );
-          }
-          return newCount;
-        });
-      });
-    }
+    // NOTE: Security monitoring disabled — no proctoring for testing
+
 
     return () => {
-      if (unsubscribeSecurity) unsubscribeSecurity();
       socket.off('contest:started', handleContestStarted);
       socket.off('contest:resumed', handleContestResumed);
       socket.off('contest:paused', handleContestPaused);
@@ -278,47 +247,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Team Paused Overlay (Security Lockout) */}
-      {isTeamPaused && !isAutoSubmitted && (
-        <div className="absolute inset-0 z-[70] flex items-center justify-center bg-red-900/90 backdrop-blur-md p-6">
-          <div className="bg-black border-4 border-red-600 rounded-xl p-10 max-w-2xl text-center shadow-[12px_12px_0px_0px_rgba(220,38,38,1)] comic-halftone">
-            <h2 className="text-5xl font-bold text-red-500 mb-4 tracking-widest font-mono">TEST PAUSED</h2>
-            <p className="text-2xl text-white mb-6">{securityWarning || `Security Violation Detected (Violation ${violationCount}/5).`}</p>
-            <p className="text-lg text-gray-300 mb-8 max-w-md mx-auto">
-              Your test session has been suspended by the anti-cheat system. You must wait for an administrator to review the logs and unlock your terminal.
-            </p>
-            <div className="inline-block px-6 py-3 border-2 border-red-600 text-red-500 font-mono text-sm uppercase tracking-widest animate-pulse">
-              PENDING ADMIN REVIEW...
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Auto Submission Overlay */}
-      {isAutoSubmitted && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-6">
-          <div className="bg-[#080810] border-4 border-red-600 rounded-xl p-10 max-w-2xl text-center shadow-[12px_12px_0px_0px_rgba(220,38,38,1)]">
-            <h1 className="text-6xl font-bold text-red-600 mb-6 font-mono tracking-tighter">TEST TERMINATED</h1>
-            <p className="text-2xl text-white font-bold mb-4">
-              Maximum security violations (5/5) reached.
-            </p>
-            <p className="text-lg text-gray-400 mb-8">
-              Your test has been automatically submitted. No further editing is permitted.
-            </p>
-            <div className="flex justify-center items-center mb-8">
-              <span className="text-red-500 animate-pulse">■</span>
-              <span className="text-red-500 animate-pulse mx-2" style={{animationDelay: '150ms'}}>■</span>
-              <span className="text-red-500 animate-pulse" style={{animationDelay: '300ms'}}>■</span>
-            </div>
-            <button 
-              onClick={() => (window as any).electronAPI?.close()}
-              className="px-10 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded border-2 border-red-400 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-transform active:translate-y-1 active:translate-x-1 active:shadow-none text-xl tracking-widest"
-            >
-              EXIT PLATFORM
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Reconnect Status Banner Alert */}
       {reconnectState !== 'IDLE' && (
@@ -339,7 +267,7 @@ export default function App() {
 
       {/* Custom Header with controls & timer */}
       <TopBar
-        isPaused={isTeamPaused || contestStatus !== 'RUNNING'}
+        isPaused={contestStatus !== 'RUNNING'}
         teamName={teamName}
         onTeamNameChange={setTeamName}
         currentScreen={currentScreen}

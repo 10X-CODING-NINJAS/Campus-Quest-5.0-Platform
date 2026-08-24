@@ -26,6 +26,8 @@ export default function TopBar({
   hintStage = 0,
   contestEndsAt = null,
 }: TopBarProps) {
+  // True when running inside the Electron desktop app; false in a plain browser.
+  const isElectron = !!(window as any).electronAPI;
   // CRITICAL-4: Derive remaining seconds from server end time
   const computeRemaining = () => {
     if (!contestEndsAt) return 0;
@@ -177,16 +179,21 @@ export default function TopBar({
         <button className="w-7 h-7 flex items-center justify-center rounded border border-transparent hover:border-black hover:bg-black/30 transition-all cursor-pointer">
           <Settings className="w-3.5 h-3.5 text-gray-400" />
         </button>
-        <div className="w-px h-4 bg-black/50 mx-0.5" />
-        <button onClick={handleMinimize} className="w-6 h-6 flex items-center justify-center rounded border border-transparent hover:border-black hover:bg-black/30 transition-all cursor-pointer">
-          <Minus className="w-3 h-3 text-gray-400" />
-        </button>
-        <button onClick={handleMaximize} className="w-6 h-6 flex items-center justify-center rounded border border-transparent hover:border-black hover:bg-black/30 transition-all cursor-pointer">
-          <Square className="w-2.5 h-2.5 text-gray-400" />
-        </button>
-        <button onClick={handleClose} className="w-6 h-6 flex items-center justify-center rounded border border-transparent hover:border-black hover:bg-red-600/80 transition-all cursor-pointer">
-          <X className="w-3 h-3 text-gray-400 hover:text-white" />
-        </button>
+        {/* Window controls: only shown in Electron where they are functional */}
+        {isElectron && (
+          <>
+            <div className="w-px h-4 bg-black/50 mx-0.5" />
+            <button onClick={handleMinimize} className="w-6 h-6 flex items-center justify-center rounded border border-transparent hover:border-black hover:bg-black/30 transition-all cursor-pointer">
+              <Minus className="w-3 h-3 text-gray-400" />
+            </button>
+            <button onClick={handleMaximize} className="w-6 h-6 flex items-center justify-center rounded border border-transparent hover:border-black hover:bg-black/30 transition-all cursor-pointer">
+              <Square className="w-2.5 h-2.5 text-gray-400" />
+            </button>
+            <button onClick={handleClose} className="w-6 h-6 flex items-center justify-center rounded border border-transparent hover:border-black hover:bg-red-600/80 transition-all cursor-pointer">
+              <X className="w-3 h-3 text-gray-400 hover:text-white" />
+            </button>
+          </>
+        )}
       </div>
     </header>
   );

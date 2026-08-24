@@ -2,9 +2,8 @@ import { db } from '../db';
 import { teams, contests, teamPowerups, submissions } from '../db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { calculateLeaderboard } from '../utils/leaderboard';
-import { reportViolation } from '../services/violations';
 
-export function registerContestHandlers(socket: any, io: any) {
+export function registerContestHandlers(socket: any, _io: any) {
   
   // When a user connects, they can request their initial state
   socket.on('contest:sync', async () => {
@@ -79,28 +78,6 @@ export function registerContestHandlers(socket: any, io: any) {
     });
   });
 
-  // Automatically triggered when frontend detects security violation
-  socket.on('violation:trigger', async ({ type }: { type: string }) => {
-    const teamId = socket.data?.teamId;
-    if (!teamId) return;
-
-    try {
-      // 1. Persist the violation, increment count, check for disqualification
-      const team = await reportViolation(teamId, type, io);
-
-      if (!team) return;
-
-      // 2. Set team to paused in DB if not disqualified
-      if (team.violationCount < 5) {
-        await db.update(teams).set({ isPaused: true }).where(eq(teams.id, teamId));
-        // Notify this specific client to show the lockout screen
-        socket.emit('team:paused');
-      }
-
-      // 3. Broadcast to admin dashboard
-      io.to('admin-room').emit('admin:violation_alert', { teamId, type, violationCount: team.violationCount });
-    } catch (err: any) {
-      console.error('[Violation Trigger Error]:', err.message);
-    }
-  });
+  // NOTE: violation:trigger handler disabled — no proctoring for testing
+  // socket.on('violation:trigger', ...) removed
 }

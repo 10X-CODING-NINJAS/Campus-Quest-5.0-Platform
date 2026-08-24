@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { db } from '../db';
 import { teams, contests, problems, submissions, teamPowerups, violations } from '../db/schema';
 import { eq, desc, and } from 'drizzle-orm';
-import { calculateLeaderboard } from '../utils/leaderboard';
+import { calculateLeaderboard, broadcastLeaderboard } from '../utils/leaderboard';
 import fs from 'fs/promises';
 import path from 'path';
 import jwt from 'jsonwebtoken';
@@ -29,6 +29,16 @@ export const TEST_TEAMS = [
   { id: 'test-team-nu',        name: 'Sinister Coders',    email: 'sinister@test.cq',   password: 'sinister6' },
   { id: 'test-team-xi',        name: 'Stark Industries',   email: 'stark@test.cq',      password: 'stark3000' },
   { id: 'test-team-omicron',   name: 'Web Warriors',       email: 'warriors@test.cq',   password: 'warriors88' },
+  { id: 'test-team-pi',        name: 'Electro Algorithms', email: 'electro@test.cq',    password: 'electro100' },
+  { id: 'test-team-rho',       name: 'Goblin Innovators',  email: 'goblin@test.cq',     password: 'goblin200' },
+  { id: 'test-team-sigma',     name: 'Rhino Compilers',    email: 'rhino@test.cq',      password: 'rhino300' },
+  { id: 'test-team-tau',       name: 'Mysterio Coders',    email: 'mysterio@test.cq',   password: 'mysterio400' },
+  { id: 'test-team-upsilon',   name: 'Kraven Hackers',     email: 'kraven@test.cq',     password: 'kraven500' },
+  { id: 'test-team-phi',       name: 'Lizard Logic',       email: 'lizard@test.cq',     password: 'lizard600' },
+  { id: 'test-team-chi',       name: 'Sandman Script',     email: 'sandman@test.cq',    password: 'sandman700' },
+  { id: 'test-team-psi',       name: 'Vulture Vector',     email: 'vulture@test.cq',    password: 'vulture800' },
+  { id: 'test-team-omega',     name: 'Carnage Bytes',      email: 'carnage@test.cq',    password: 'carnage900' },
+  { id: 'test-team-25',        name: 'Kingpin Coders',     email: 'kingpin@test.cq',    password: 'kingpin999' },
 ];
 
 // Seed test teams into DB on startup (idempotent)
@@ -187,6 +197,44 @@ export default async function adminRoutes(fastify: FastifyInstance) {
       io.emit('team:disqualified_all');
     }
     return { success: true, message: 'Emergency stop activated. All teams disqualified.' };
+  });
+
+  // 1f. Reset Global Contest and Clear All Submissions/Scores
+  fastify.post('/admin/reset-contest', async (_request, _reply) => {
+    // 1. Clear submissions, team powerups, violations
+    await db.delete(submissions);
+    await db.delete(teamPowerups);
+    await db.delete(violations);
+
+    // 2. Reset team stats
+    await db.update(teams).set({
+      violationCount: 0,
+      isDisqualified: false,
+      isPaused: false,
+      spiderSenseCharges: 1,
+      hintStage: 0,
+    });
+
+    // 3. Reset contest status
+    const allContests = await db.select().from(contests);
+    if (allContests.length > 0) {
+      await db.update(contests)
+        .set({
+          status: 'NOT_STARTED',
+          startedAt: null,
+          pausedAt: null,
+          totalPausedMs: 0,
+          endsAt: null,
+        })
+        .where(eq(contests.id, allContests[0].id));
+    }
+
+    const io = (fastify as any).io;
+    if (io) {
+      io.emit('contest:ended');
+      await broadcastLeaderboard(io, db);
+    }
+    return { success: true, message: 'Contest reset. All team scores, submissions, and powerups cleared.' };
   });
 
   // 2. Resume a Paused Team

@@ -66,10 +66,7 @@ export function registerJudgeHandlers(socket: any) {
         socket.emit('submit:result', { status: 'REJECTED', message: 'Team not found.' });
         return;
       }
-      if (existingTeam.isPaused || existingTeam.isDisqualified) {
-        socket.emit('submit:result', { status: 'REJECTED', message: 'Your team is currently paused or disqualified.' });
-        return;
-      }
+      // NOTE: isPaused / isDisqualified checks removed for testing — no proctoring
 
       console.log(`[Judge] Submitting code for problem: ${problemId}, language: ${language}`);
       const [problem] = await db.select().from(problems).where(eq(problems.id, problemId));
@@ -143,6 +140,7 @@ export function registerJudgeHandlers(socket: any) {
         status: 'DONE', 
         verdict: submission.verdict,
         testCases: results,
+        testCaseResults: results, // alias — frontend reads this field
         problemId
       });
 
