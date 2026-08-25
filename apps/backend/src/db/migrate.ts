@@ -31,6 +31,26 @@ export async function runMigrations() {
         ADD COLUMN IF NOT EXISTS lobby_started_at TIMESTAMP,
         ADD COLUMN IF NOT EXISTS lobby_duration_ms INTEGER DEFAULT 900000
     `);
+    await db.execute(sql`
+      ALTER TABLE teams
+        ADD COLUMN IF NOT EXISTS freeze_ends_at TIMESTAMP
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "spider_sense_challenges" (
+        "id" text PRIMARY KEY NOT NULL,
+        "team_id" text NOT NULL,
+        "problem_id" text NOT NULL,
+        "question_ids" json NOT NULL,
+        "correct_indices" json NOT NULL,
+        "options_list" json NOT NULL,
+        "attempt_count" integer DEFAULT 0 NOT NULL,
+        "completed_questions" integer DEFAULT 0 NOT NULL,
+        "is_completed" boolean DEFAULT false NOT NULL,
+        "is_consumed" boolean DEFAULT false NOT NULL,
+        "created_at" timestamp DEFAULT now() NOT NULL,
+        "completed_at" timestamp
+      )
+    `);
 
     // Run the Drizzle migration files (idempotent — already-applied migrations are skipped).
     await migrate(db, { migrationsFolder });

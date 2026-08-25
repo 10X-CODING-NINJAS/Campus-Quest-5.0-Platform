@@ -176,8 +176,18 @@ export default function App() {
                 setMaxUnlockedQuestion(solvedProblemIdsRef.current.size + bypassedProblemIdsRef.current.size + 1);
             }
             // CRITICAL-4: Restore timer from sync result (handles reconnects)
-            if (data.endsAt)
+            // If freezeEndsAt is active (team timer is frozen/extended), use it as endsAt.
+            if (data.freezeEndsAt) {
+                setContestEndsAt(data.freezeEndsAt);
+            }
+            else if (data.endsAt) {
                 setContestEndsAt(data.endsAt);
+            }
+        };
+        const handleTimerFrozen = (data) => {
+            if (data.freezeEndsAt) {
+                setContestEndsAt(data.freezeEndsAt);
+            }
         };
         socket.on('contest:started', handleContestStarted);
         socket.on('contest:lobby_started', handleLobbyStarted);
@@ -188,15 +198,17 @@ export default function App() {
         socket.on('team:resumed', handleTeamResumed);
         socket.on('team:progress_updated', handleProgressUpdated);
         socket.on('team:disqualified_all', handleDisqualifiedAll);
-        socket.on('submit:result', handleSubmitResult);
-        socket.on('powerup:updated', handlePowerupUpdated);
-        socket.on('contest:sync_result', handleSyncResult);
-        socket.on('leaderboard:update', (data) => {
+        socket.on('team:timer_frozen', handleTimerFrozen);
+        const handleLeaderboardUpdate = (data) => {
             if (data.currentRank !== undefined)
                 setCurrentRank(data.currentRank);
             if (data.solvedCount !== undefined)
                 setSolvedCount(data.solvedCount);
-        });
+        };
+        socket.on('submit:result', handleSubmitResult);
+        socket.on('powerup:updated', handlePowerupUpdated);
+        socket.on('contest:sync_result', handleSyncResult);
+        socket.on('leaderboard:update', handleLeaderboardUpdate);
         // C4: Do NOT emit contest:sync here. The socket is not connected yet before login.
         // contest:sync is emitted by the reconnect handler after connectSocket() is called.
         // NOTE: Security monitoring disabled — no proctoring for testing
@@ -210,35 +222,52 @@ export default function App() {
             socket.off('team:resumed', handleTeamResumed);
             socket.off('team:progress_updated', handleProgressUpdated);
             socket.off('team:disqualified_all', handleDisqualifiedAll);
+            socket.off('team:timer_frozen', handleTimerFrozen);
             socket.off('submit:result', handleSubmitResult);
             socket.off('powerup:updated', handlePowerupUpdated);
             socket.off('contest:sync_result', handleSyncResult);
-            socket.off('leaderboard:update');
+            socket.off('leaderboard:update', handleLeaderboardUpdate);
         };
     }, [problems, questionNum]); // Re-bind if problems list or questionNum changes to ensure current reference exists in closure
-    // MEDIUM-2: Reconnect handling in isolated effect
+    // MEDIUM-2: Reconnect handling in isolated effect.
+    // dep=[] so listeners are registered exactly once for the app lifetime.
     useEffect(() => {
+        const wasReconnecting = { value: false };
         const handleConnect = () => {
-            setReconnectState(prev => {
-                if (prev === 'RECONNECTING' || prev === 'DISCONNECTED') {
-                    socket.emit('contest:sync');
-                    setTimeout(() => setReconnectState('IDLE'), 3500);
-                    return 'RESTORED';
-                }
-                return 'IDLE';
-            });
+            if (wasReconnecting.value) {
+                // Authoritative server-state sync on every reconnect
+                socket.emit('contest:sync');
+                setReconnectState('RESTORED');
+                setTimeout(() => setReconnectState('IDLE'), 3500);
+            }
+            else {
+                setReconnectState('IDLE');
+            }
+            wasReconnecting.value = false;
         };
-        const handleDisconnect = () => setReconnectState('DISCONNECTED');
-        const handleConnectError = () => setReconnectState('RECONNECTING');
+        const handleDisconnect = () => {
+            wasReconnecting.value = true;
+            setReconnectState('DISCONNECTED');
+        };
+        const handleConnectError = () => {
+            wasReconnecting.value = true;
+            setReconnectState('RECONNECTING');
+        };
+        const handleReconnectAttempt = () => {
+            wasReconnecting.value = true;
+            setReconnectState('RECONNECTING');
+        };
         socket.on('connect', handleConnect);
         socket.on('disconnect', handleDisconnect);
         socket.on('connect_error', handleConnectError);
+        socket.io.on('reconnect_attempt', handleReconnectAttempt);
         return () => {
             socket.off('connect', handleConnect);
             socket.off('disconnect', handleDisconnect);
             socket.off('connect_error', handleConnectError);
+            socket.io.off('reconnect_attempt', handleReconnectAttempt);
         };
-    }, [reconnectState]);
+    }, []); // Intentionally empty: register once per app lifetime
     // Auto-navigate screen based on contestStatus
     useEffect(() => {
         if (contestStatus === 'RUNNING' && currentScreen === 'lobby') {

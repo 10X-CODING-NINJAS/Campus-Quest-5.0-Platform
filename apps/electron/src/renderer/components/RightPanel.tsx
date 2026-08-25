@@ -413,10 +413,8 @@ export default function RightPanel({
       <SpideySenseModal
         isOpen={isSpideyModalOpen}
         onClose={() => setIsSpideyModalOpen(false)}
-        onUse={() => {
-          onUsePowerup('SPIDER_SENSE', currentProblem?.id);
-          onUseSpideySenseSuccess?.();
-        }}
+        problemId={currentProblem?.id}
+        onUseSuccess={onUseSpideySenseSuccess}
       />
     </div>
   );

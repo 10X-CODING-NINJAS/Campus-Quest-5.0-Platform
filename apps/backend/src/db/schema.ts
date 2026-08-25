@@ -29,6 +29,7 @@ export const teams = pgTable('teams', {
   spiderSenseCharges: integer('spider_sense_charges').notNull().default(1),
   hintStage: integer('hint_stage').notNull().default(0),
 
+  freezeEndsAt: timestamp('freeze_ends_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -117,6 +118,24 @@ export const teamWorkspaces = pgTable('team_workspaces', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => [
   index('team_workspaces_team_id_problem_id_idx').on(table.teamId, table.problemId),
+]);
+
+// ---------- Spider-Sense MCQ Challenges ----------
+export const spiderSenseChallenges = pgTable('spider_sense_challenges', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  teamId: text('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  problemId: text('problem_id').notNull().references(() => problems.id, { onDelete: 'cascade' }),
+  questionIds: json('question_ids').$type<number[]>().notNull(), // indices or IDs of the 3 questions
+  correctIndices: json('correct_indices').$type<number[]>().notNull(), // correct option index for each of the 3 questions (after option shuffle)
+  optionsList: json('options_list').$type<string[][]>().notNull(), // shuffled options lists for each of the 3 questions
+  attemptCount: integer('attempt_count').notNull().default(0),
+  completedQuestions: integer('completed_questions').notNull().default(0), // 0 to 3
+  isCompleted: boolean('is_completed').notNull().default(false),
+  isConsumed: boolean('is_consumed').notNull().default(false),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  completedAt: timestamp('completed_at'),
+}, (table) => [
+  index('spider_sense_challenges_team_id_idx').on(table.teamId),
 ]);
 
 // ---------- Relations ----------

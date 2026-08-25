@@ -174,7 +174,18 @@ export default function App() {
       }
 
       // CRITICAL-4: Restore timer from sync result (handles reconnects)
-      if (data.endsAt) setContestEndsAt(data.endsAt);
+      // If freezeEndsAt is active (team timer is frozen/extended), use it as endsAt.
+      if (data.freezeEndsAt) {
+        setContestEndsAt(data.freezeEndsAt);
+      } else if (data.endsAt) {
+        setContestEndsAt(data.endsAt);
+      }
+    };
+
+    const handleTimerFrozen = (data: { freezeEndsAt: string }) => {
+      if (data.freezeEndsAt) {
+        setContestEndsAt(data.freezeEndsAt);
+      }
     };
 
     socket.on('contest:started', handleContestStarted);
@@ -186,6 +197,7 @@ export default function App() {
     socket.on('team:resumed', handleTeamResumed);
     socket.on('team:progress_updated', handleProgressUpdated);
     socket.on('team:disqualified_all', handleDisqualifiedAll);
+    socket.on('team:timer_frozen', handleTimerFrozen);
     const handleLeaderboardUpdate = (data: any) => {
       if (data.currentRank !== undefined) setCurrentRank(data.currentRank);
       if (data.solvedCount !== undefined) setSolvedCount(data.solvedCount);
@@ -211,6 +223,7 @@ export default function App() {
       socket.off('team:resumed', handleTeamResumed);
       socket.off('team:progress_updated', handleProgressUpdated);
       socket.off('team:disqualified_all', handleDisqualifiedAll);
+      socket.off('team:timer_frozen', handleTimerFrozen);
       socket.off('submit:result', handleSubmitResult);
       socket.off('powerup:updated', handlePowerupUpdated);
       socket.off('contest:sync_result', handleSyncResult);

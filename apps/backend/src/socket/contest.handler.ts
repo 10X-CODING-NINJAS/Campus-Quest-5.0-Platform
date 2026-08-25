@@ -35,12 +35,16 @@ export function registerContestHandlers(socket: any, _io: any) {
     let solvedProblemIds: string[] = [];
     let bypassedProblemIds: string[] = [];
     let currentRank = 1;
+    let freezeEndsAt: string | null = null;
 
     if (teamId) {
       const teamData = await db.select().from(teams).where(eq(teams.id, teamId));
       if (teamData.length > 0) {
         isPaused = teamData[0].isPaused;
         hintStage = teamData[0].hintStage;
+        if (teamData[0].freezeEndsAt) {
+          freezeEndsAt = new Date(teamData[0].freezeEndsAt).toISOString();
+        }
       }
       
       const allUsages = await db.select()
@@ -89,6 +93,7 @@ export function registerContestHandlers(socket: any, _io: any) {
       lobbyTimeLeftMs,
       // Timing data for client-side timer synchronization
       endsAt: globalContest?.endsAt ? new Date(globalContest.endsAt).toISOString() : null,
+      freezeEndsAt,
       serverTime: new Date().toISOString(),
     });
   });
